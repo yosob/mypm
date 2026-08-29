@@ -8,6 +8,7 @@ logs/
 
 # 依赖与构建
 app/node_modules/
+app/scripts/
 
 # 第三方参考物（体积大，单独管理）
 pi-main/
