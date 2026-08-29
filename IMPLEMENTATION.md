@@ -36,9 +36,9 @@
 
 ```
 GLM_API_KEY=891b...（OpenAI 兼容 https://open.bigmodel.cn/api/coding/paas/v4，模型 glm-4.7）
-LARK_APP_ID=****REDACTED****
-LARK_APP_SECRET=****REDACTED****
-FEISHU_WEBHOOK=https://open.larksuite.com/open-apis/bot/v2/hook/****REDACTED****...
+LARK_APP_ID=cli_xxxxxxxx（见 .env）
+LARK_APP_SECRET=xxxxxxxx（见 .env）
+FEISHU_WEBHOOK=https://open.larksuite.com/open-apis/bot/v2/hook/xxxxx（见 .env）
 REMIND_DAYS=7
 PORT=8787
 ```

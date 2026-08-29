@@ -32,9 +32,9 @@
 
 | 项 | 值 | 状态 |
 |---|---|---|
-| GLM OpenAI 兼容 | `https://open.bigmodel.cn/api/coding/paas/v4` + key `891b...` | ✅ 已连通测试（glm-4.7，提取一次约 1-3 分钟） |
+| GLM OpenAI 兼容 | `https://open.bigmodel.cn/api/coding/paas/v4` + key `891b**`（完整值在 .env） | ✅ 已连通测试（glm-4.7，提取一次约 1-3 分钟） |
 | GLM Anthropic 兼容 | `https://open.bigmodel.cn/api/anthropic`（备用） | 未测 |
-| Lark 应用 | `****REDACTED****` / secret `QyMj...` | ✅ 应用已发布，权限已批（p2p_msg:readonly、group_at_msg:readonly、send_as_bot、事件 im.message.receive_v1、长连接模式） |
+| Lark 应用 | `cli_aa1a...` / secret `QyMj...`（完整值在 .env） | ✅ 应用已发布，权限已批（p2p_msg:readonly、group_at_msg:readonly、send_as_bot、事件 im.message.receive_v1、长连接模式） |
 | 飞书 Webhook | `https://open.larksuite.com/open-apis/bot/v2/hook/cc98...` | ✅ 已推卡片成功 |
 | 看板端口 | 8787 | 未占用 |
 

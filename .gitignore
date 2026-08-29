@@ -14,3 +14,4 @@ pi-main/
 
 # 临时
 *.corrupt-*
+ref/
