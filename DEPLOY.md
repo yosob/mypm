@@ -115,5 +115,6 @@ launchctl unload ~/Library/LaunchAgents/com.mypm.app.plist # 停用
 cd app
 npm run chat          # 终端对话：问"列出所有项目"验证 AI + 数据都在
 npm run check         # 手动触发提醒（机器人私聊应收到卡片）
-python3 scripts/debug-web.py  # 看板零报错（需 pip install playwright && python3 -m playwright install chromium）
 ```
+
+> `app/scripts/` 下的开发/测试脚本（debug-web.py 等）**不随 git 分发**（已 gitignore），新机上按需自写或从旧机拷贝；上面两条命令已覆盖核心回归。
