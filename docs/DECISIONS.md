@@ -85,3 +85,12 @@
 - ai.ts 移除 zaiCodingCnProvider 引用；registerCustom 是唯一注册路径
 - 旧配置兼容：llm{apiKey} / glm 节 → 自动合成 zhipu provider 项
 - README llm 节同步重写（顶层选厂家，providers[] 抄段即增厂家）
+
+## 决议 #32（2026-08-30）：Agent 定时器工具（set_timer / list_timers / cancel_timer）
+
+- timers 表：run_at(一次性) 与 cron(周期) 二选一；状态 active/fired/cancelled
+- 调度：周期任务动态注册 node-cron（内存 Map，重启时恢复 active）；一次性由每分钟
+  tick 扫描，run_at<=now 即触发（服务宕机错过的时刻会在重启后首个 tick 补发一次）
+- 触发动作：机器人私聊卡片（复用 notifyCard，与每日任务提醒同通道）
+- 相对时间（明天下午3点）由 AI 换算为绝对 run_at（prompt 规则 12）
+- 测试：单元 5 用例（过去触发/未来不触发/cron注册/取消/列表）+ AI e2e 四轮全过

@@ -4,6 +4,7 @@ import { startWeb } from "./web/server";
 import { config } from "./config";
 import { startLark } from "./lark";
 import { runCheck } from "./check";
+import { startTimers } from "./timers";
 import { log } from "./paths";
 import cron from "node-cron";
 
@@ -11,6 +12,7 @@ const PORT = config.app.port;
 
 startWeb(PORT);
 startLark();
+startTimers();
 
 // 每天 9:00 提醒 + 备份
 cron.schedule(config.app.remindCron, () => {

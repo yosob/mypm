@@ -3,6 +3,7 @@ import { localDate } from "./paths";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import * as db from "./db";
 import { extractUpdates } from "./ai";
+import { scheduleCron } from "./timers";
 
 function ok(text: string) {
 	return { content: [{ type: "text" as const, text }], details: {} };
@@ -269,6 +270,50 @@ export const pmTools: AgentTool<any, any>[] = [
 			});
 			if (!t) throw new Error(`任务 ${params.task_id} 不存在`);
 			return ok(`已更新：${fmtTask(t)}`);
+		},
+	},
+	{
+		name: "set_timer",
+		label: "设置定时提醒",
+		description:
+			"用户要你'到点提醒我/定时提醒/每周X提醒我'时调用。一次性提醒传 run_at（格式 YYYY-MM-DD HH:mm，24小时制）；周期提醒传 cron（标准表达式，如每天9点='0 9 * * *'，每周一8点半='30 8 * * 1'，工作日='0 9 * * 1-5'）。title 是提醒内容。相对时间（明天下午3点）先换算成绝对时间再传。",
+		parameters: Type.Object({
+			title: Type.String({ description: "提醒内容（会原样出现在提醒卡片标题）" }),
+			run_at: Type.Optional(Type.String({ description: "一次性触发时刻 YYYY-MM-DD HH:mm" })),
+			cron: Type.Optional(Type.String({ description: "周期 cron 表达式" })),
+		}),
+		executionMode: "sequential",
+		async execute(_id, params: any) {
+			const t = db.createTimer({ title: params.title, run_at: params.run_at ?? null, cron: params.cron ?? null });
+			if (t.cron) scheduleCron(t);
+			return ok(
+				`定时器已设置 [id=${t.id}]「${t.title}」${t.cron ? `周期：${t.cron}` : `时刻：${t.run_at}`}，到点机器人会私聊提醒`,
+			);
+		},
+	},
+	{
+		name: "list_timers",
+		label: "查询定时器",
+		description: "列出用户设置的定时提醒（含已触发/已取消的历史），用户问'我有哪些提醒'时调用。",
+		parameters: Type.Object({}),
+		async execute() {
+			const ts = db.listTimers();
+			if (!ts.length) return ok("（暂无定时提醒）");
+			const stTxt: Record<string, string> = { active: "生效中", fired: "已触发", cancelled: "已取消" };
+			return ok(
+				ts.map((t) => `[id=${t.id}]「${t.title}」｜ ${t.cron ? `周期 ${t.cron}` : t.run_at} ｜ ${stTxt[t.status] ?? t.status}`).join("\n"),
+			);
+		},
+	},
+	{
+		name: "cancel_timer",
+		label: "取消定时器",
+		description: "取消某个定时提醒。参数为 list_timers 返回的 id。",
+		parameters: Type.Object({ timer_id: Type.Number({ description: "定时器 id" }) }),
+		executionMode: "sequential",
+		async execute(_id, params: any) {
+			if (!db.cancelTimer(params.timer_id)) throw new Error(`定时器 ${params.timer_id} 不存在或已结束`);
+			return ok(`已取消定时提醒 [id=${params.timer_id}]`);
 		},
 	},
 	{

@@ -22,10 +22,11 @@
 | `config.ts` | 单一配置加载：读根目录 config.json，`$ENV` 引用解析，默认值合并（.env 已退役） | `config, resolveEnvRef` |
 | `db.ts` | SQLite 全部读写：7 张表建表、CRUD、提取两段式（pending→apply 事务）、备份与完整性自恢复、会话/设置存取 | `db, listProjects, findProject, createTask, applyPending, backup, saveSession...` |
 | `ai.ts` | 多 provider 模型装配（config.llm.providers 统一声明，智谱无特例，OpenAI/Anthropic 兼容）+ 纪要提取器 + 会话摘要压缩 | `models, model, streamFn, registerCustom, extractUpdates, summarizeHistory` |
-| `tools.ts` | **11 个 AgentTool**（AI 与数据之间唯一通道） | `pmTools` |
+| `tools.ts` | **14 个 AgentTool**（AI 与数据之间唯一通道） | `pmTools` |
 | `agent.ts` | 用 pi Agent 组装会话：system prompt（含今天日期）、工具、会话持久化（agent_sessions 表：200 条上限，超限 GLM 滚动摘要压缩至最近 50 条，SESSION_MAX/KEEP 可配） | `makeAgent, askAgent, systemPrompt` |
 | `lark.ts` | Lark WebSocket 桥：收消息（私聊直通/群聊须@）、按 chat_id 哈希隔离会话、同会话串行、回复分段、"正在提取"提示、5 分钟超时、记住主人 open_id | `startLark` |
 | `notify.ts` | 提醒卡片推送：优先应用机器人私聊（im.message.create），备用群 Webhook | `notifyCard` |
+| `timers.ts` | Agent 定时提醒调度器：周期任务动态注册 node-cron（重启恢复），一次性由每分钟 tick 驱动（错过的立即补发一次） | `startTimers, scheduleCron, stopCron` |
 | `check.ts` | 提醒扫描：进 7 天窗口一次 + 逾期当天一次，reminders 表防重复；顺带每日备份 | `runCheck` |
 | `web/server.ts` | 看板 API：`GET /api/dashboard`、`POST /api/tasks/:id/toggle`、静态页 | `startWeb` |
 | `web/public/index.html` | 单页看板，三视图（dhtmlx甘特/任务列表/看板拖拽）、筛选排序搜索、任务与项目居中编辑弹窗、资料行内编辑、自定义字段（⚙管理+侧栏编辑），vendor 本地化（dhtmlx） | — |
@@ -50,8 +51,10 @@
 | `update_project` | 写 | 项目目标/状态/项目截止日 |
 | `add_resource` | 写 | 资料（项目级或任务级 task_id） |
 | `set_custom_field` | 写 | 自定义字段（模糊匹配字段名，未定义则引导） |
+| `set_timer` | 写 | 定时提醒（run_at 一次性 / cron 周期） |
+| `list_timers` / `cancel_timer` | 读/写 | 定时器查询/取消 |
 
-写库工具全部 `executionMode: "sequential"`。共 **11 个工具**。**没有 delete 工具**——删除仅看板可做（防误删，决议 #12）。
+写库工具全部 `executionMode: "sequential"`。共 **14 个工具**。**没有 delete 工具**——删除仅看板可做（防误删，决议 #12）。
 
 ## 四、两条核心数据流
 

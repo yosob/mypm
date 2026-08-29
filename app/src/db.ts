@@ -74,6 +74,15 @@ CREATE TABLE IF NOT EXISTS custom_fields(
   options TEXT DEFAULT '',       -- select 的逗号分隔选项
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS timers(
+  id INTEGER PRIMARY KEY,
+  title TEXT NOT NULL,           -- 提醒内容
+  cron TEXT,                     -- 周期表达式（与 run_at 二选一）
+  run_at TEXT,                   -- 一次性触发时刻 YYYY-MM-DD HH:mm
+  status TEXT DEFAULT 'active',  -- active | fired | cancelled
+  last_run TEXT,
+  created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settings(
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -525,6 +534,48 @@ export function loadSession(chatKey: string): SessionData | null {
 	const parsed = JSON.parse(row.messages_json);
 	if (Array.isArray(parsed)) return { summary: "", messages: parsed };
 	return parsed as SessionData;
+}
+
+// ---------- timers（agent 定时提醒） ----------
+
+export type Timer = {
+	id: number;
+	title: string;
+	cron: string | null;
+	run_at: string | null;
+	status: string;
+	last_run: string | null;
+	created_at: string;
+};
+
+export function createTimer(input: { title: string; cron?: string | null; run_at?: string | null }): Timer {
+	if (!input.cron && !input.run_at) throw new Error("cron 与 run_at 至少填一个");
+	const info = db
+		.prepare("INSERT INTO timers(title, cron, run_at, created_at) VALUES(?,?,?,?)")
+		.run(input.title, input.cron ?? null, input.run_at ?? null, new Date().toISOString());
+	return db.prepare("SELECT * FROM timers WHERE id=?").get(info.lastInsertRowid) as Timer;
+}
+
+export function listTimers(onlyActive = false): Timer[] {
+	return onlyActive
+		? (db.prepare("SELECT * FROM timers WHERE status='active' ORDER BY id").all() as Timer[])
+		: (db.prepare("SELECT * FROM timers ORDER BY id DESC").all() as Timer[]);
+}
+
+export function getTimer(id: number): Timer | undefined {
+	return db.prepare("SELECT * FROM timers WHERE id=?").get(id) as Timer | undefined;
+}
+
+export function cancelTimer(id: number): boolean {
+	return db.prepare("UPDATE timers SET status='cancelled' WHERE id=? AND status='active'").run(id).changes > 0;
+}
+
+export function markTimerFired(id: number) {
+	db.prepare("UPDATE timers SET status='fired', last_run=? WHERE id=?").run(new Date().toISOString(), id);
+}
+
+export function touchTimerRun(id: number) {
+	db.prepare("UPDATE timers SET last_run=? WHERE id=?").run(new Date().toISOString(), id);
 }
 
 // ---------- settings kv ----------
