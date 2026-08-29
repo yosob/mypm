@@ -67,11 +67,11 @@ npm run dev        # 启动；或 Windows 双击项目根 start-mypm.bat
 
 | 想了解 | 看这份 |
 |---|---|
-| 功能全景与同类软件对照 | FEATURES.md |
-| 系统怎么搭的 | IMPLEMENTATION.md · app/ARCHITECTURE.md |
-| AI 如何连接数据（工具/循环/确认流） | AI-NATIVE.md |
-| 部署/换机（Win→Mac/Linux） | DEPLOY.md |
-| 所有设计决议与踩坑 | DECISIONS.md · DETAILS.md |
+| 功能全景与同类软件对照 | docs/FEATURES.md |
+| 系统怎么搭的 | docs/IMPLEMENTATION.md · app/ARCHITECTURE.md |
+| AI 如何连接数据（工具/循环/确认流） | docs/AI-NATIVE.md |
+| 部署/换机（Win→Mac/Linux） | docs/DEPLOY.md |
+| 所有设计决议与踩坑 | docs/DECISIONS.md · docs/DETAILS.md |
 
 ## 边界与二期
 
