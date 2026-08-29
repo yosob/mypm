@@ -57,7 +57,7 @@ npm run dev        # 启动；或 Windows 双击项目根 start-mypm.bat
 ```
 
 - 看板：http://127.0.0.1:8787 ｜ Lark：私聊机器人说句"你好"（首次私聊会记住你，用于提醒推送）
-- 日志 `logs/`，备份 `backups/`，数据 `app/data/mypm.db`
+- 首次运行会**自动创建**数据库 `app/data/mypm.db` 及 `logs/`、`backups/` 目录——克隆后唯一要准备的只有 `config.json`
 
 ## 配置说明（config.json）
 
@@ -143,7 +143,3 @@ v1（Vikunja + 脚本）已退役清理；v2 为 pi agent + 自建数据层的 A
 ## License
 
 [MIT](LICENSE)
-
-## 目录里的"本地资产"说明
-
-以下内容是开发者本机文件，**不随 git 分发**（已 gitignore）：`config.json`（含密钥）、`app/data/`（数据库）、`backups/`、`logs/`、`ref/`、`pi-main/`、`app/scripts/`（开发测试脚本）。克隆本仓库后按「快速开始」三步即可获得完整可运行环境。
