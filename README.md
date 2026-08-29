@@ -53,7 +53,7 @@
 # 0) 准备：Node ≥22、GLM API Key、Lark 自建应用（创建步骤见 docs/LARK.md）
 # 1) 配置：复制 config.example.json 为 config.json，填入密钥（见下方"配置说明"）
 cd app && npm install
-npm run dev        # 启动；或 Windows 双击项目根 start-mypm.bat
+npm run dev        # 启动（Windows/Mac/Linux 通用）
 ```
 
 - 看板：http://127.0.0.1:8787 ｜ Lark：私聊机器人说句"你好"（首次私聊会记住你，用于提醒推送）

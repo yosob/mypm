@@ -90,7 +90,7 @@ npm run chat     # 终端对话（调试 agent）
 npm run check    # 手动触发提醒+备份
 ```
 
-- 日志：`../logs/mypm.log`（结构化）与 `../logs/mypm-run.log`（start-mypm.bat 重定向）
+- 日志：`../logs/mypm.log`（结构化）；前台运行时可自行重定向
 - 备份：`../backups/mypm-YYYYMMDD.db`
 - 配置：根目录 `.env`（GLM key、Lark 凭证、Webhook、REMIND_DAYS、PORT）
 

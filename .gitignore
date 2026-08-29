@@ -1,6 +1,9 @@
 # 配置（含密钥，勿提交；模板见 config.example.json）
 config.json
 
+# 个人 AI 工作目录说明（本机文件）
+CLAUDE.md
+
 # 运行数据与备份
 app/data/
 backups/

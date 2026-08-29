@@ -55,7 +55,7 @@ npm run dev          # 前台运行：Web 看板 + Lark 桥 + 每日9点提醒
 - 日志出现 `Lark WebSocket 已连接`
 - Lark 私聊机器人一句话测试；`npm run check` 验证提醒推送
 
-> `start-mypm.bat` 是 Windows 专用，Mac 直接 `npm run dev`（或见下文自启动）。
+> Windows/Mac/Linux 统一 `npm run dev` 启动；Windows 想双击启动可自建一个内容为 `cd app && npm run dev` 的 .bat。
 
 ## 三、旧机停用
 

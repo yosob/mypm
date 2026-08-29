@@ -95,7 +95,7 @@ Lark 重启进程后会话将清空 → 用户接着聊会丢上下文。方案�
 | 项 | 方案 |
 |---|---|
 | 启动 | `npm run dev`（开发）/ 打包 `tsx` 常驻：`npm start` |
-| 开机自启 | 写 `start-mypm.bat`（启动 mypm）+ 放入 `shell:startup` 文件夹；比任务计划简单 |
+| 开机自启 | Windows：自建 bat（cd app && npm run dev）放 shell:startup；Mac：见 DEPLOY launchd |
 | 日志 | console + `>> logs/mypm.log` 重定向；按天轮转（P1 换 pino） |
 | 停止旧服务 | Vikunja exe 进程、dsh node 进程关闭（v2 验证后执行） |
 
