@@ -319,8 +319,9 @@ async function load(){
     document.getElementById("f-options").style.display=e.target.value==="select"?"":"none";
   };
   document.getElementById("p-save").onclick=saveProject;
-  renderStats();render();showRes(document.getElementById("proj-filter").value);
-  if(curTaskId&&!editing)fillDetail(curTaskId);
+  renderStats();render();
+  if(!editingResKey&&!editing)showRes(document.getElementById("proj-filter").value);
+  if(curTaskId&&!editing&&!editingResKey)fillDetail(curTaskId);
 }
 
 function switchTab(t){
@@ -626,14 +627,17 @@ async function editResRow(rid,ownerId,kind,el){
   const key=kind+":"+rid;
   if(editingResKey===key)return;
   editingResKey=key;
+  editing=true; // 阻止 60s 自动刷新重渲染侧栏/面板
   let r=null;
   if(kind==="proj"){const p=DATA.projects.find(x=>x.id===ownerId);r=p?.resources.find(x=>x.id===rid);}
   else{for(const pr of DATA.projects){const t=pr.tasks.find(x=>x.id===ownerId);if(t){r=(t.resources||[]).find(x=>x.id===rid);break;}}}
   if(!r||!el)return;
   el.innerHTML=`<div style="display:flex;gap:5px;align-items:center">
     <select id="er-type" style="flex:0 0 80px"><option value="wechat_group"${r.type==="wechat_group"?" selected":""}>微信群</option><option value="link"${r.type==="link"?" selected":""}>链接</option><option value="note"${r.type==="note"?" selected":""}>备注</option></select>
-    <input id="er-label" value="${(r.label||"").replace(/"/g,"&quot;")}" placeholder="说明" style="flex:0 0 80px">
-    <input id="er-value" value="${r.value.replace(/"/g,"&quot;")}" style="flex:1">
+    <input id="er-label" value="${(r.label||"").replace(/"/g,"&quot;")}" placeholder="说明" style="flex:0 0 80px"
+      onkeydown="if(event.key==='Enter')saveResRow(${rid},${ownerId},'${kind}')">
+    <input id="er-value" value="${r.value.replace(/"/g,"&quot;")}" style="flex:1"
+      onkeydown="if(event.key==='Enter')saveResRow(${rid},${ownerId},'${kind}');if(event.key==='Escape')cancelResRow(${rid},${ownerId},'${kind}')">
     <button onclick="saveResRow(${rid},${ownerId},'${kind}')" style="flex:0 0 40px">✓</button>
     <button onclick="cancelResRow(${rid},${ownerId},'${kind}')" style="flex:0 0 40px">✕</button>
   </div>`;
@@ -646,13 +650,13 @@ async function saveResRow(rid,ownerId,kind){
   const url=kind==="proj"?`/api/resources/${rid}/update`:`/api/task-resources/${rid}/update`;
   const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   if(!r.ok)return alert("保存失败");
-  editingResKey=null;
+  editingResKey=null;editing=false;
   await load();
-  if(kind==="proj"){refreshProjRes(ownerId);if(curTaskId&&!editing)fillDetail(curTaskId);}else fillDetail(ownerId);
+  if(kind==="proj"){refreshProjRes(ownerId);if(curTaskId)fillDetail(curTaskId);}else fillDetail(ownerId);
 }
 function cancelResRow(rid,ownerId,kind){
-  editingResKey=null;
-  if(kind==="proj"){refreshProjRes(ownerId);if(curTaskId&&!editing)fillDetail(curTaskId);}else fillDetail(ownerId);
+  editingResKey=null;editing=false;
+  if(kind==="proj"){refreshProjRes(ownerId);if(curTaskId)fillDetail(curTaskId);}else fillDetail(ownerId);
 }
 async function delTaskRes(rid,taskId){
   await fetch(`/api/task-resources/${rid}`,{method:"DELETE"});
