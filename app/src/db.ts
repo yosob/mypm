@@ -505,20 +505,26 @@ export function markReminded(taskId: number, kind: "window" | "overdue") {
 
 // ---------- agent sessions ----------
 
-export function saveSession(chatKey: string, messages: unknown) {
-	const trimmed = Array.isArray(messages) ? messages.slice(-40) : messages;
+/** 会话持久化结构：滚动摘要 + 最近原始消息（压缩在 agent.ts compactIfNeeded） */
+export type SessionData = { summary: string; messages: any[] };
+
+export function saveSession(chatKey: string, data: SessionData) {
 	db.prepare("INSERT OR REPLACE INTO agent_sessions(chat_key, messages_json, updated_at) VALUES(?,?,?)").run(
 		chatKey,
-		JSON.stringify(trimmed),
+		JSON.stringify(data),
 		new Date().toISOString(),
 	);
 }
 
-export function loadSession(chatKey: string): unknown[] | null {
+/** 兼容旧格式（纯数组）：自动升级为 {summary:"",messages} */
+export function loadSession(chatKey: string): SessionData | null {
 	const row = db.prepare("SELECT messages_json FROM agent_sessions WHERE chat_key=?").get(chatKey) as
 		| { messages_json: string }
 		| undefined;
-	return row ? JSON.parse(row.messages_json) : null;
+	if (!row) return null;
+	const parsed = JSON.parse(row.messages_json);
+	if (Array.isArray(parsed)) return { summary: "", messages: parsed };
+	return parsed as SessionData;
 }
 
 // ---------- settings kv ----------

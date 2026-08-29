@@ -90,3 +90,42 @@ export async function extractUpdates(content: string): Promise<ExtractedUpdate> 
 	}
 	throw new Error(`纪要提取失败: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
 }
+
+// ---------- 会话历史压缩 ----------
+
+const SUMMARIZE_PROMPT = `你是项目助手的长程记忆压缩器。把【旧摘要】与【较早的对话记录】合并成一份新的摘要，供 AI 助手后续对话时参考。
+
+要求：
+- 保留所有关键信息：任务 id/名称/日期、用户的决定与偏好、项目名、微信群名/链接、未完结的话题
+- 丢弃寒暄与重复
+- 中文，分条列出，不超过 500 字
+
+【旧摘要】
+{prev}
+
+【较早的对话记录】
+{older}`;
+
+/** 把旧摘要 + 更早的原始消息 合并压缩为新摘要。失败返回 prev（不丢数据）。 */
+export async function summarizeHistory(prev: string, older: any[]): Promise<string> {
+	const transcript = older
+		.map((m: any, i: number) => {
+			const role = m.role === "user" ? "用户" : m.role === "assistant" ? "助手" : "工具结果";
+			const blocks = m.content ?? [];
+			const text = (Array.isArray(blocks) ? blocks : [])
+				.map((b: any) => (b.type === "text" ? b.text : b.type === "toolCall" ? `[调用 ${b.name}]` : ""))
+				.join(" ")
+				.slice(0, 400);
+			return `${i + 1}. ${role}: ${text}`;
+		})
+		.join("\n")
+		.slice(0, 24000);
+	const prompt = SUMMARIZE_PROMPT.replace("{prev}", prev || "（无）").replace("{older}", transcript);
+	try {
+		const out = await completeText("你是对话摘要器。", prompt);
+		return out.trim() || prev;
+	} catch (e) {
+		console.error("会话摘要压缩失败，保留旧摘要", e);
+		return prev;
+	}
+}

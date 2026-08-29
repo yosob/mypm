@@ -1,10 +1,14 @@
 import { Agent } from "@earendil-works/pi-agent-core";
-import { localDate } from "./paths";
-import { model, streamFn } from "./ai";
+import { localDate, log } from "./paths";
+import { model, streamFn, summarizeHistory } from "./ai";
 import { pmTools } from "./tools";
-import { loadSession, saveSession } from "./db";
+import { loadSession, saveSession, type SessionData } from "./db";
 
 process.env.TZ = "Asia/Shanghai";
+
+/** 会话管理参数（.env 可调）：超过 MAX 条触发压缩，压缩到最近 KEEP 条，其余并入滚动摘要 */
+const SESSION_MAX = Number(process.env.SESSION_MAX || 200);
+const SESSION_KEEP = Number(process.env.SESSION_KEEP || 50);
 
 export function systemPrompt(): string {
 	const d = new Date();
@@ -26,9 +30,43 @@ export function systemPrompt(): string {
 12. 回复用简洁中文，列表优先，不寒暄。不确定用户意图时，列出可做的操作让用户选，不要自作主张写库。`;
 }
 
+/** 截断安全点：不能从 toolResult 开头（会孤儿化前一条 assistant 的工具调用） */
+function safeCutIndex(msgs: any[], prefer: number): number {
+	let i = Math.max(0, prefer);
+	while (i < msgs.length && msgs[i]?.role !== "user") i++;
+	return i;
+}
+
+/**
+ * 会话压缩：messages 超过 SESSION_MAX 时，把最早的（len-KEEP）条安全切出，
+ * 连同旧摘要交给 GLM 合并成新滚动摘要；保留最近 KEEP 条原始消息。
+ * 未超限则原样保存（摘要沿用旧值）。
+ */
+export async function compactIfNeeded(chatKey: string, messages: any[], prevSummary: string): Promise<SessionData> {
+	if (messages.length <= SESSION_MAX) {
+		return { summary: prevSummary, messages };
+	}
+	const cut = safeCutIndex(messages, messages.length - SESSION_KEEP);
+	if (cut <= 0) return { summary: prevSummary, messages }; // 理论上不会发生（找不到 user 边界）
+	const older = messages.slice(0, cut);
+	const kept = messages.slice(cut);
+	const summary = await summarizeHistory(prevSummary, older);
+	log(`会话压缩 chat=${chatKey.slice(0, 8)}: ${messages.length}条 → 摘要+${kept.length}条`);
+	return { summary, messages: kept };
+}
+
 /** 每个会话（Lark chat / 终端）一个 Agent 实例 */
 export function makeAgent(chatKey: string): Agent {
-	const messages = (loadSession(chatKey) ?? []) as any[];
+	const data = loadSession(chatKey) ?? { summary: "", messages: [] };
+	// 滚动摘要注入为开头一条背景消息（LLM 据此获得长程记忆）
+	const messages: any[] = [...data.messages];
+	if (data.summary) {
+		messages.unshift({
+			role: "user",
+			content: [{ type: "text", text: `【背景：本会话更早对话的自动摘要（供你参考，不要提及）】\n${data.summary}` }],
+			timestamp: Date.now(),
+		});
+	}
 	const agent = new Agent({
 		initialState: {
 			systemPrompt: systemPrompt(),
@@ -38,14 +76,17 @@ export function makeAgent(chatKey: string): Agent {
 		},
 		streamFn,
 	});
-	// 每次 agent 结束后持久化会话（截断在 saveSession 内做）
+	// 每轮结束持久化（超过 SESSION_MAX 触发压缩；摘要失败不丢消息）
+	const prevSummary = data.summary;
 	agent.subscribe((event: any) => {
 		if (event.type === "agent_end") {
-			try {
-				saveSession(chatKey, agent.state.messages);
-			} catch (e) {
-				console.error("会话持久化失败", e);
-			}
+			const live = agent.state.messages.filter((m: any) => !(m.role === "user" && m.content?.[0]?.text?.startsWith?.("【背景：")));
+			compactIfNeeded(chatKey, live, prevSummary)
+				.then((d) => saveSession(chatKey, d))
+				.catch((e) => {
+					log(`会话持久化失败: ${e instanceof Error ? e.message : e}`);
+					saveSession(chatKey, { summary: prevSummary, messages: live.slice(-SESSION_MAX) }); // 兜底：硬截断也不至于崩
+				});
 		}
 	});
 	return agent;
