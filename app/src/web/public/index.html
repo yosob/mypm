@@ -200,6 +200,16 @@
       <label>状态</label><select id="p-status"><option value="active">推进中</option><option value="paused">已搁置</option><option value="done">已完成</option></select>
       <label>项目截止日</label><input id="p-end" type="date">
       <div class="mops"><button onclick="closeProjModal()">取消</button><button class="primary" id="p-save">保存</button></div>
+      <div id="modal-res-wrap" style="display:none">
+        <h5 style="font-size:12px;color:#7f8c8d;margin:16px 0 6px">项目资料（微信群 / 链接 / 备注）</h5>
+        <div id="modal-res-list"></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <select id="mr-type" style="flex:0 0 92px"><option value="wechat_group">微信群</option><option value="link">链接</option><option value="note">备注</option></select>
+          <input id="mr-label" placeholder="说明(可选)" style="flex:0 0 90px">
+          <input id="mr-value" placeholder="群名或链接" style="flex:1">
+          <button onclick="addProjResUI(editingProjId,'modal')" style="flex:0 0 46px">＋</button>
+        </div>
+      </div>
       <button id="p-del" class="dangerbtn" style="display:none">🗑 删除整个项目（含任务/资料/历史）</button>
     </div>
   </div>
@@ -486,7 +496,7 @@ function fillDetail(id){
   html+=`<h5>任务资料（微信群/链接）</h5><div id="tres-box">${
     trs.length?trs.map(r=>`<div class="res-item" id="tres-${r.id}">${tresIcon(r.type)} ${r.label?r.label+" ":""}${
       r.type==="link"?`<a href="${r.value}" target="_blank">${r.value}</a>`:r.value
-    } <span style="cursor:pointer;color:#7f8c8d" onclick="editResRow(${r.id},${t.id},'task')">✎</span>
+    } <span style="cursor:pointer;color:#7f8c8d" onclick="editResRow(${r.id},${t.id},'task',this)">✎</span>
       <span class="del-res" style="cursor:pointer;color:#b0b6bc" onclick="delTaskRes(${r.id},${t.id})">×</span></div>`).join(""):`<div class="res-item" style="color:#b0b6bc">（无）</div>`
   }</div>
   <div class="tres-add" style="display:flex;gap:6px;margin-top:8px">
@@ -553,15 +563,13 @@ async function saveCustom(taskId){
   await load();fillDetail(taskId);
 }
 let editingResKey=null;
-async function editResRow(rid,ownerId,kind){
+async function editResRow(rid,ownerId,kind,el){
   const key=kind+":"+rid;
-  if(editingResKey===key)return; // 已在编辑
+  if(editingResKey===key)return;
   editingResKey=key;
-  // 找到数据
   let r=null;
   if(kind==="proj"){const p=DATA.projects.find(x=>x.id===ownerId);r=p?.resources.find(x=>x.id===rid);}
   else{for(const pr of DATA.projects){const t=pr.tasks.find(x=>x.id===ownerId);if(t){r=(t.resources||[]).find(x=>x.id===rid);break;}}}
-  const el=document.getElementById((kind==="proj"?"pres-":"tres-")+rid);
   if(!r||!el)return;
   el.innerHTML=`<div style="display:flex;gap:5px;align-items:center">
     <select id="er-type" style="flex:0 0 80px"><option value="wechat_group"${r.type==="wechat_group"?" selected":""}>微信群</option><option value="link"${r.type==="link"?" selected":""}>链接</option><option value="note"${r.type==="note"?" selected":""}>备注</option></select>
@@ -581,11 +589,11 @@ async function saveResRow(rid,ownerId,kind){
   if(!r.ok)return alert("保存失败");
   editingResKey=null;
   await load();
-  if(kind==="proj")showRes(String(ownerId));else fillDetail(ownerId);
+  if(kind==="proj")refreshProjRes(ownerId);else fillDetail(ownerId);
 }
-async function cancelResRow(rid,ownerId,kind){
+function cancelResRow(rid,ownerId,kind){
   editingResKey=null;
-  if(kind==="proj")showRes(String(ownerId));else fillDetail(ownerId);
+  if(kind==="proj")refreshProjRes(ownerId);else fillDetail(ownerId);
 }
 async function delTaskRes(rid,taskId){
   await fetch(`/api/task-resources/${rid}`,{method:"DELETE"});
@@ -620,18 +628,19 @@ async function addFieldUI(){
 }
 
 // ---------- 项目资料增删 ----------
-async function addProjResUI(pid){
-  const type=(document.getElementById("pr-type")||{}).value||"wechat_group";
-  const value=(document.getElementById("pr-value")||{}).value?.trim();
-  const label=(document.getElementById("pr-label")||{}).value?.trim()||"";
+async function addProjResUI(pid,src){
+  const pre=src==="modal"?"mr":"pr";
+  const type=(document.getElementById(pre+"-type")||{}).value||"wechat_group";
+  const value=(document.getElementById(pre+"-value")||{}).value?.trim();
+  const label=(document.getElementById(pre+"-label")||{}).value?.trim()||"";
   if(!value)return alert("请填内容");
   const r=await fetch(`/api/projects/${pid}/resources`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type,value,label})});
   if(!r.ok)return alert("添加失败");
-  await load();showRes(String(pid));
+  await load();refreshProjRes(pid);
 }
 async function delProjRes(rid,pid){
   await fetch(`/api/resources/${rid}`,{method:"DELETE"});
-  await load();showRes(String(pid));
+  await load();refreshProjRes(pid);
 }
 
 // ---------- 新建任务 ----------
@@ -677,6 +686,9 @@ function openProjModal(p){
   const delBtn=document.getElementById("p-del");
   delBtn.style.display=p?"":"none";
   delBtn.onclick=deleteProjectUI;
+  const resWrap=document.getElementById("modal-res-wrap");
+  resWrap.style.display=p?"":"none";
+  if(p)document.getElementById("modal-res-list").innerHTML=projResHTML(p);
   document.getElementById("p-name").focus();
 }
 function closeProjModal(){document.getElementById("proj-mask").style.display="none";}
@@ -745,21 +757,33 @@ function showRes(v){
   if(!p){panel.style.display="none";return;}
   panel.style.display="";
   document.getElementById("res-title").textContent=`📁 ${p.name} · 资料与历史`;
-  let html="";
-  if(!p.resources.length)html+=`<div class="res-item" style="color:#b0b6bc">（暂无资料，用下方添加）</div>`;
-  p.resources.forEach(r=>{
-    html+=`<div class="res-item" id="pres-${r.id}">${r.type==="wechat_group"?"💬 微信群":r.type==="link"?"🔗":"📄"} ${r.label?r.label+" ":""}${r.type==="link"?`<a href="${r.value}" target="_blank">${r.value}</a>`:r.value}
-      <span style="cursor:pointer;color:#7f8c8d" onclick="editResRow(${r.id},${p.id},'proj')">✎</span>
-      <span style="cursor:pointer;color:#b0b6bc" onclick="delProjRes(${r.id},${p.id})">×</span></div>`;
-  });
-  html+=`<div class="tres-add" style="display:flex;gap:6px;margin-top:8px">
-    <select id="pr-type" style="flex:0 0 92px"><option value="wechat_group">微信群</option><option value="link">链接</option><option value="note">备注</option></select>
-    <input id="pr-label" placeholder="说明(可选)" style="flex:0 0 90px">
-    <input id="pr-value" placeholder="群名或链接" style="flex:1">
-    <button onclick="addProjResUI(${p.id})" style="flex:0 0 46px">＋</button>
+  document.getElementById("res-body").innerHTML=projResHTML(p)+projResAddRow(p.id,"panel")+
+    (p.history.length?`<div class="hist">${p.history.map(h=>`· ${h.date} ${h.summary}`).join("<br>")}</div>`:"");
+}
+function projResHTML(p){
+  if(!p.resources.length)return `<div class="res-item" style="color:#b0b6bc">（暂无资料，用下方添加）</div>`;
+  return p.resources.map(r=>`<div class="res-item">${r.type==="wechat_group"?"💬 微信群":r.type==="link"?"🔗":"📄"} ${r.label?r.label+" ":""}${r.type==="link"?`<a href="${r.value}" target="_blank">${r.value}</a>`:r.value}
+    <span style="cursor:pointer;color:#7f8c8d" onclick="editResRow(${r.id},${p.id},'proj',this)">✎</span>
+    <span style="cursor:pointer;color:#b0b6bc" onclick="delProjRes(${r.id},${p.id})">×</span></div>`).join("");
+}
+function projResAddRow(pid,src){
+  const pre=src==="modal"?"mr":"pr";
+  return `<div style="display:flex;gap:6px;margin-top:8px">
+    <select id="${pre}-type" style="flex:0 0 92px"><option value="wechat_group">微信群</option><option value="link">链接</option><option value="note">备注</option></select>
+    <input id="${pre}-label" placeholder="说明(可选)" style="flex:0 0 90px">
+    <input id="${pre}-value" placeholder="群名或链接" style="flex:1">
+    <button onclick="addProjResUI(${pid},'${src}')" style="flex:0 0 46px">＋</button>
   </div>`;
-  if(p.history.length)html+=`<div class="hist">${p.history.map(h=>`· ${h.date} ${h.summary}`).join("<br>")}</div>`;
-  document.getElementById("res-body").innerHTML=html;
+}
+/** 保存/删除后刷新所有项目资料区块（弹窗 + 右侧面板） */
+function refreshProjRes(pid){
+  const p=DATA.projects.find(x=>x.id===pid);
+  if(!p)return;
+  const wrap=document.getElementById("modal-res-wrap");
+  if(wrap&&wrap.style.display!=="none"&&editingProjId===pid){
+    document.getElementById("modal-res-list").innerHTML=projResHTML(p);
+  }
+  if(document.getElementById("proj-filter").value===String(pid))showRes(String(pid));
 }
 
 load();
