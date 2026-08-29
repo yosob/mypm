@@ -21,7 +21,7 @@
 | `paths.ts` | 目录常量（一切限制在项目目录内）、日志、`localDate()` 本地日期 | `ROOT, DB_PATH, log, localDate` |
 | `db.ts` | SQLite 全部读写：7 张表建表、CRUD、提取两段式（pending→apply 事务）、备份与完整性自恢复、会话/设置存取 | `db, listProjects, findProject, createTask, applyPending, backup, saveSession...` |
 | `ai.ts` | GLM 模型装配（pi 内置智谱 provider）+ 纪要提取器（单次 LLM 调用，固定 prompt → 严格 JSON，失败重试一次） | `models, model, streamFn, extractUpdates` |
-| `tools.ts` | **9 个 AgentTool**（AI 与数据之间唯一通道） | `pmTools` |
+| `tools.ts` | **11 个 AgentTool**（AI 与数据之间唯一通道） | `pmTools` |
 | `agent.ts` | 用 pi Agent 组装会话：system prompt（含今天日期）、工具、会话持久化（agent_sessions 表，截断 40 条） | `makeAgent, askAgent, systemPrompt` |
 | `lark.ts` | Lark WebSocket 桥：收消息（私聊直通/群聊须@）、按 chat_id 哈希隔离会话、同会话串行、回复分段、"正在提取"提示、5 分钟超时、记住主人 open_id | `startLark` |
 | `notify.ts` | 提醒卡片推送：优先应用机器人私聊（im.message.create），备用群 Webhook | `notifyCard` |
