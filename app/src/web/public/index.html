@@ -484,9 +484,10 @@ function fillDetail(id){
   if(t.description)html+=`<h5>内容</h5><div class="desc">${t.description}</div>`;
   const trs=t.resources||[];
   html+=`<h5>任务资料（微信群/链接）</h5><div id="tres-box">${
-    trs.length?trs.map(r=>`<div class="res-item" data-rid="${r.id}">${tresIcon(r.type)} ${r.label?r.label+" ":""}${
+    trs.length?trs.map(r=>`<div class="res-item" id="tres-${r.id}">${tresIcon(r.type)} ${r.label?r.label+" ":""}${
       r.type==="link"?`<a href="${r.value}" target="_blank">${r.value}</a>`:r.value
-    } <span class="del-res" style="cursor:pointer;color:#b0b6bc" onclick="delTaskRes(${r.id},${t.id})">×</span></div>`).join(""):`<div class="res-item" style="color:#b0b6bc">（无）</div>`
+    } <span style="cursor:pointer;color:#7f8c8d" onclick="editResRow(${r.id},${t.id},'task')">✎</span>
+      <span class="del-res" style="cursor:pointer;color:#b0b6bc" onclick="delTaskRes(${r.id},${t.id})">×</span></div>`).join(""):`<div class="res-item" style="color:#b0b6bc">（无）</div>`
   }</div>
   <div class="tres-add" style="display:flex;gap:6px;margin-top:8px">
     <select id="tr-type" style="flex:0 0 92px"><option value="wechat_group">微信群</option><option value="link">链接</option><option value="note">备注</option></select>
@@ -550,6 +551,41 @@ async function saveCustom(taskId){
   const r=await fetch(`/api/tasks/${taskId}/custom`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});
   if(!r.ok)return alert("保存失败");
   await load();fillDetail(taskId);
+}
+let editingResKey=null;
+async function editResRow(rid,ownerId,kind){
+  const key=kind+":"+rid;
+  if(editingResKey===key)return; // 已在编辑
+  editingResKey=key;
+  // 找到数据
+  let r=null;
+  if(kind==="proj"){const p=DATA.projects.find(x=>x.id===ownerId);r=p?.resources.find(x=>x.id===rid);}
+  else{for(const pr of DATA.projects){const t=pr.tasks.find(x=>x.id===ownerId);if(t){r=(t.resources||[]).find(x=>x.id===rid);break;}}}
+  const el=document.getElementById((kind==="proj"?"pres-":"tres-")+rid);
+  if(!r||!el)return;
+  el.innerHTML=`<div style="display:flex;gap:5px;align-items:center">
+    <select id="er-type" style="flex:0 0 80px"><option value="wechat_group"${r.type==="wechat_group"?" selected":""}>微信群</option><option value="link"${r.type==="link"?" selected":""}>链接</option><option value="note"${r.type==="note"?" selected":""}>备注</option></select>
+    <input id="er-label" value="${(r.label||"").replace(/"/g,"&quot;")}" placeholder="说明" style="flex:0 0 80px">
+    <input id="er-value" value="${r.value.replace(/"/g,"&quot;")}" style="flex:1">
+    <button onclick="saveResRow(${rid},${ownerId},'${kind}')" style="flex:0 0 40px">✓</button>
+    <button onclick="cancelResRow(${rid},${ownerId},'${kind}')" style="flex:0 0 40px">✕</button>
+  </div>`;
+}
+async function saveResRow(rid,ownerId,kind){
+  const body={type:document.getElementById("er-type").value,
+    value:document.getElementById("er-value").value.trim(),
+    label:document.getElementById("er-label").value.trim()};
+  if(!body.value)return alert("内容不能为空");
+  const url=kind==="proj"?`/api/resources/${rid}/update`:`/api/task-resources/${rid}/update`;
+  const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok)return alert("保存失败");
+  editingResKey=null;
+  await load();
+  if(kind==="proj")showRes(String(ownerId));else fillDetail(ownerId);
+}
+async function cancelResRow(rid,ownerId,kind){
+  editingResKey=null;
+  if(kind==="proj")showRes(String(ownerId));else fillDetail(ownerId);
 }
 async function delTaskRes(rid,taskId){
   await fetch(`/api/task-resources/${rid}`,{method:"DELETE"});
@@ -712,7 +748,9 @@ function showRes(v){
   let html="";
   if(!p.resources.length)html+=`<div class="res-item" style="color:#b0b6bc">（暂无资料，用下方添加）</div>`;
   p.resources.forEach(r=>{
-    html+=`<div class="res-item">${r.type==="wechat_group"?"💬 微信群":r.type==="link"?"🔗":"📄"} ${r.label?r.label+" ":""}${r.type==="link"?`<a href="${r.value}" target="_blank">${r.value}</a>`:r.value} <span style="cursor:pointer;color:#b0b6bc" onclick="delProjRes(${r.id},${p.id})">×</span></div>`;
+    html+=`<div class="res-item" id="pres-${r.id}">${r.type==="wechat_group"?"💬 微信群":r.type==="link"?"🔗":"📄"} ${r.label?r.label+" ":""}${r.type==="link"?`<a href="${r.value}" target="_blank">${r.value}</a>`:r.value}
+      <span style="cursor:pointer;color:#7f8c8d" onclick="editResRow(${r.id},${p.id},'proj')">✎</span>
+      <span style="cursor:pointer;color:#b0b6bc" onclick="delProjRes(${r.id},${p.id})">×</span></div>`;
   });
   html+=`<div class="tres-add" style="display:flex;gap:6px;margin-top:8px">
     <select id="pr-type" style="flex:0 0 92px"><option value="wechat_group">微信群</option><option value="link">链接</option><option value="note">备注</option></select>

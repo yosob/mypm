@@ -334,6 +334,11 @@ export function deleteTask(id: number): boolean {
 
 // ---------- resources / history ----------
 
+export function updateResource(id: number, patch: { type?: string; value?: string; label?: string }) {
+	db.prepare("UPDATE resources SET type=COALESCE(?,type), value=COALESCE(?,value), label=COALESCE(?,label) WHERE id=?")
+		.run(patch.type ?? null, patch.value ?? null, patch.label ?? null, id);
+}
+
 export function deleteResource(id: number): boolean {
 	return db.prepare("DELETE FROM resources WHERE id=?").run(id).changes > 0;
 }
@@ -400,6 +405,11 @@ export function addTaskResource(taskId: number, type: string, value: string, lab
 export function listTaskResources(taskId?: number): (Resource & { task_id: number })[] {
 	if (taskId) return db.prepare("SELECT * FROM task_resources WHERE task_id=? ORDER BY id").all(taskId) as any;
 	return db.prepare("SELECT * FROM task_resources ORDER BY task_id, id").all() as any;
+}
+
+export function updateTaskResource(id: number, patch: { type?: string; value?: string; label?: string }) {
+	db.prepare("UPDATE task_resources SET type=COALESCE(?,type), value=COALESCE(?,value), label=COALESCE(?,label) WHERE id=?")
+		.run(patch.type ?? null, patch.value ?? null, patch.label ?? null, id);
 }
 
 export function deleteTaskResource(id: number): boolean {

@@ -106,6 +106,12 @@ export function startWeb(port: number) {
 		return c.json({ ok: true });
 	});
 
+	app.post("/api/task-resources/:rid/update", async (c) => {
+		const b = await c.req.json<any>().catch(() => null);
+		if (!b?.value) return c.json({ error: "value 必填" }, 400);
+		db.updateTaskResource(Number(c.req.param("rid")), { type: b.type, value: String(b.value), label: b.label ?? "" });
+		return c.json({ ok: true });
+	});
 	app.delete("/api/task-resources/:rid", (c) => {
 		return c.json({ ok: db.deleteTaskResource(Number(c.req.param("rid"))) });
 	});
@@ -141,6 +147,12 @@ export function startWeb(port: number) {
 		const b = await c.req.json<any>().catch(() => null);
 		if (!b?.value || !["wechat_group", "link", "note"].includes(b.type || "")) return c.json({ error: "type 与 value 必填" }, 400);
 		db.addResource(id, b.type, String(b.value), b.label || "");
+		return c.json({ ok: true });
+	});
+	app.post("/api/resources/:rid/update", async (c) => {
+		const b = await c.req.json<any>().catch(() => null);
+		if (!b?.value) return c.json({ error: "value 必填" }, 400);
+		db.updateResource(Number(c.req.param("rid")), { type: b.type, value: String(b.value), label: b.label ?? "" });
 		return c.json({ ok: true });
 	});
 	app.delete("/api/resources/:rid", (c) => c.json({ ok: db.deleteResource(Number(c.req.param("rid"))) }));
