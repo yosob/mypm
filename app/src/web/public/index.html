@@ -100,14 +100,17 @@
   .kcard .kd.norm { background:#eceff1; color:#78909c; }
 
   /* 任务详情侧栏（重构版） */
-  #detail { position:fixed; top:0; right:-440px; width:420px; height:100vh; background:#fff; box-shadow:-6px 0 28px rgba(0,0,0,.16); z-index:50; transition:right .25s; display:flex; flex-direction:column; }
-  #detail.open { right:0; }
-  .dt-scroll { flex:1; overflow-y:auto; padding:0 18px 12px; }
-  .dt-head { position:sticky; top:0; background:linear-gradient(#fff 82%,rgba(255,255,255,0)); padding:16px 44px 10px 0; z-index:2; }
+  #detail { position:fixed; inset:0; background:rgba(15,25,35,.4); z-index:55; display:none; align-items:flex-start; justify-content:center; padding:4vh 16px; }
+  #detail.open { display:flex; }
+  .dt-box { position:relative; width:760px; max-width:96vw; max-height:90vh; background:#fff; border-radius:14px; box-shadow:0 14px 56px rgba(0,0,0,.3); display:flex; flex-direction:column; overflow:hidden; animation:dtIn .18s ease-out; }
+  @keyframes dtIn { from { transform:translateY(10px); opacity:0; } to { transform:none; opacity:1; } }
+  #detail-body { display:flex; flex-direction:column; min-height:0; }
+  .dt-scroll { flex:1; overflow-y:auto; padding:0 24px 12px; }
+  .dt-head { position:sticky; top:0; background:linear-gradient(#fff 82%,rgba(255,255,255,0)); padding:18px 48px 10px 0; z-index:2; }
   .dt-head .dt-proj { font-size:12px; margin-bottom:6px; }
   .dt-head h2 { font-size:16px; line-height:1.45; margin:0; padding-right:4px; }
   .dt-badges { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
-  #detail .close { position:absolute; top:12px; right:12px; width:28px; height:28px; border-radius:50%; border:0; background:#f0f2f5; font-size:15px; cursor:pointer; color:#5f6b76; z-index:3; }
+  #detail .close { position:absolute; top:14px; right:14px; width:30px; height:30px; border-radius:50%; border:0; background:#f0f2f5; font-size:16px; cursor:pointer; color:#5f6b76; z-index:3; }
   #detail .close:hover { background:#e4e8ee; }
   .dt-metas { margin:12px 0 4px; border:1px solid #eef0f3; border-radius:10px; overflow:hidden; }
   .dt-metas .row { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; font-size:13px; border-bottom:1px solid #f3f5f7; }
@@ -124,7 +127,7 @@
   .dt-sec .desc { background:#fff; border:1px solid #eef0f3; border-radius:8px; padding:9px 11px; font-size:13px; white-space:pre-wrap; line-height:1.6; }
   .dt-sec .timeline-item { font-size:12px; color:#5f6b76; padding:5px 0; border-bottom:1px dashed #e8ebee; line-height:1.55; }
   .dt-sec .timeline-item:last-child { border-bottom:0; }
-  .dt-foot { position:sticky; bottom:0; background:linear-gradient(rgba(255,255,255,0),#fff 30%); padding:12px 18px 16px; display:flex; gap:10px; }
+  .dt-foot { border-top:1px solid #eef0f3; background:#fff; padding:13px 24px 15px; display:flex; gap:10px; }
   .dt-foot button { flex:1; padding:9px 0; border-radius:8px; border:1px solid #d0d4d8; background:#fff; cursor:pointer; font-size:13px; }
   .dt-foot button.primary { background:var(--c1); color:#fff; border-color:var(--c1); }
   .dt-foot button.danger { color:var(--danger); border-color:#eecfcb; background:#fff; }
@@ -201,9 +204,11 @@
 </div>
 
 <!-- 任务详情侧栏 -->
-<div id="detail">
-  <button class="close" onclick="closeDetail()">×</button>
-  <div id="detail-body"></div>
+<div id="detail" onclick="if(event.target===this)closeDetail()">
+  <div class="dt-box">
+    <button class="close" onclick="closeDetail()">×</button>
+    <div id="detail-body"></div>
+  </div>
 </div>
 
 <!-- 字段管理弹窗 -->
