@@ -297,7 +297,9 @@ async function load(){
   document.getElementById("n-soon").textContent=DATA.summary.dueSoon;
   document.getElementById("n-overdue").textContent=DATA.summary.overdue;
   const sel=document.getElementById("proj-filter");
+  const prevSel=sel.value; // load 重建下拉会重置选择，先记住再恢复
   sel.innerHTML='<option value="all">全部项目</option>'+DATA.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+  if([...sel.options].some(o=>o.value===prevSel)) sel.value=prevSel;
   sel.onchange=()=>{render();showRes(sel.value);};
   document.getElementById("status-filter").onchange=render;
   document.getElementById("search").oninput=render;
