@@ -12,11 +12,15 @@ function fmtTask(t: db.Task): string {
 	const statusLabel = t.done || t.status === "done" ? "已完成" : t.status === "doing" ? "进行中" : "待办";
 	const flags = [t.is_milestone ? "◆里程碑" : "", t.priority && t.priority !== "P3" ? t.priority : ""].filter(Boolean).join(" ");
 	const overdue = !t.done && t.due_date && t.due_date < localDate() ? "【逾期】" : "";
-	return `[id=${t.id}] ${t.project_name} ｜ ${t.title}${t.due_date ? ` ｜ 截止 ${t.due_date}` : ""} ｜ ${statusLabel}${flags ? ` ｜ ${flags}` : ""} ${overdue}`.trim();
+	const sched = t.start_date && t.due_date ? ` ｜ ${t.start_date}~${t.due_date}` : t.due_date ? ` ｜ 截止 ${t.due_date}` : "";
+	return `[id=${t.id}] ${t.project_name} ｜ ${t.title}${sched} ｜ ${statusLabel}${flags ? ` ｜ ${flags}` : ""} ${overdue}`.trim();
 }
 
 function fmtProject(p: db.Project, withTasks = true): string {
-	const lines = [`「${p.name}」 ${p.description ? `- ${p.description}` : ""}`];
+	const stTxt: Record<string, string> = { active: "推进中", done: "已完成", paused: "已搁置" };
+	const lines = [
+		`「${p.name}」${stTxt[p.status] ? `（${stTxt[p.status]}）` : ""}${p.end_date ? ` ｜ 项目截止 ${p.end_date}` : ""} ${p.description ? `- ${p.description}` : ""}`,
+	];
 	if (withTasks) {
 		const tasks = db.listTasks({ projectId: p.id, includeDone: true });
 		if (tasks.length) lines.push(...tasks.map((t) => `  ${fmtTask(t)}`));
@@ -150,6 +154,62 @@ export const pmTools: AgentTool<any, any>[] = [
 		async execute(_id, params: any) {
 			if (!db.discardPending(params.update_id)) throw new Error(`更新 #${params.update_id} 不存在或已处理`);
 			return ok(`已丢弃更新 #${params.update_id}`);
+		},
+	},
+	{
+		name: "get_task",
+		label: "任务详情",
+		description:
+			"查单个任务的完整信息：排期/状态/优先级/内容/任务资料(微信群/链接)/自定义字段/父子任务。用户问某个任务的具体情况、任务上挂了什么资料时调用。",
+		parameters: Type.Object({ task_id: Type.Number({ description: "任务id" }) }),
+		async execute(_id, params: any) {
+			const t = db.getTask(params.task_id);
+			if (!t) throw new Error(`任务 ${params.task_id} 不存在`);
+			const lines = [fmtTask(t)];
+			if (t.description) lines.push(`内容：${t.description}`);
+			const trs = db.listTaskResources(t.id);
+			if (trs.length)
+				lines.push(
+					"任务资料：\n" +
+						trs
+							.map((r) => `  - ${r.type === "wechat_group" ? "微信群" : r.type === "link" ? "链接" : "备注"}：${r.label ? r.label + " " : ""}${r.value}`)
+							.join("\n"),
+				);
+			const fields = db.listFields();
+			const custom = db.getCustom(t);
+			if (fields.length) {
+				const part = fields.map((f) => `  - ${f.name}: ${custom[String(f.id)] ?? ""}`).join("\n");
+				lines.push(`自定义字段：\n${part}`);
+			}
+			if (t.parent_id) {
+				const pt = db.getTask(t.parent_id);
+				if (pt) lines.push(`父任务：[id=${pt.id}] ${pt.title}`);
+			}
+			const subs = db.listTasks({ includeDone: true }).filter((x) => x.parent_id === t.id);
+			if (subs.length)
+				lines.push("子任务：\n" + subs.map((x) => `  - [id=${x.id}] ${x.title}${x.done ? " ✅" : ""}`).join("\n"));
+			return ok(lines.join("\n"));
+		},
+	},
+	{
+		name: "set_custom_field",
+		label: "设置自定义字段",
+		description:
+			"为任务设置自定义字段值（如负责人、合同号等，字段需先在看板⚙自定义字段中定义）。field 传字段名（支持模糊匹配），value 传值。",
+		parameters: Type.Object({
+			task_id: Type.Number({ description: "任务id" }),
+			field: Type.String({ description: "字段名" }),
+			value: Type.String({ description: "字段值" }),
+		}),
+		executionMode: "sequential",
+		async execute(_id, params: any) {
+			const t = db.getTask(params.task_id);
+			if (!t) throw new Error(`任务 ${params.task_id} 不存在`);
+			const fields = db.listFields();
+			const f = fields.find((x) => x.name === params.field) ?? fields.find((x) => x.name.includes(params.field));
+			if (!f) throw new Error(`没有自定义字段「${params.field}」。现有字段：${fields.map((x) => x.name).join("、") || "（无）"}`);
+			db.setCustom(params.task_id, { [String(f.id)]: params.value });
+			return ok(`已设置 ${t.title} 的「${f.name}」= ${params.value}`);
 		},
 	},
 	{
