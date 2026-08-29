@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>mypm 看板</title>
-<script src="vendor/frappe-gantt.umd.js"></script>
-<link rel="stylesheet" href="vendor/frappe-gantt.css">
+<script src="vendor/dhtmlx/dhtmlxgantt.js"></script>
+<link rel="stylesheet" href="vendor/dhtmlx/dhtmlxgantt.css">
 <style>
   :root { --c1:#4a6fa5; --danger:#c0392b; --warn:#d4a017; --ok:#27ae60; }
   * { box-sizing: border-box; margin: 0; }
@@ -62,11 +62,24 @@
   .hist { margin-top:6px; color:#7f8c8d; font-size:12px; line-height:1.6; }
   .empty { color:#95a5a6; padding:20px; text-align:center; background:#fff; border-radius:8px; }
 
-  .bar-color-0 { fill:#4a6fa5 !important; } .bar-color-1 { fill:#7a9e7e !important; }
-  .bar-color-2 { fill:#b08552 !important; } .bar-color-3 { fill:#8a6f9e !important; }
-  .bar-color-4 { fill:#a05a7e !important; } .bar-color-5 { fill:#5a8ea0 !important; }
-  .bar-overdue .bar { stroke:var(--danger); stroke-width:2px; }
-  .bar-soon .bar { stroke:var(--warn); stroke-width:2px; stroke-dasharray:4 2; }
+  /* dhtmlx 甘特定制 */
+  #gantt { height:100%; }
+  .gantt-wrap { min-height:340px; }
+  .gantt_grid_head_cell, .gantt_grid_cell { border-color:#eef0f2 !important; font-size:12px; }
+  .gantt_row, .gantt_row.odd { background:#fff; }
+  .gantt_row:hover { background:#f4f7fb; }
+  .gantt_row.gantt_project { background:#fafbfd; font-weight:600; }
+  .gantt_task_line { border-radius:5px !important; box-shadow:0 1px 2px rgba(0,0,0,.18); }
+  .gantt_task_content { font-size:12px; padding:0 8px; color:#fff; }
+  .pc0 .gantt_task_content,.pc0{background:#4a6fa5 !important;} .pc1 .gantt_task_content,.pc1{background:#7a9e7e !important;}
+  .pc2 .gantt_task_content,.pc2{background:#b08552 !important;} .pc3 .gantt_task_content,.pc3{background:#8a6f9e !important;}
+  .pc4 .gantt_task_content,.pc4{background:#a05a7e !important;} .pc5 .gantt_task_content,.pc5{background:#5a8ea0 !important;}
+  .gantt_task_line.g-overdue { box-shadow:0 0 0 2px var(--danger) inset; }
+  .gantt_task_line.g-soon { box-shadow:0 0 0 2px var(--warn) inset; }
+  .gantt_task_line.g-ms { box-shadow:0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.25); }
+  .today_marker { background:var(--danger); width:2px; opacity:.85; }
+  .today_marker::before { content:"今天"; position:absolute; top:-18px; left:-12px; font-size:10px; color:var(--danger); }
+  .gantt_tooltip { font-size:12px; }
 
   /* 看板视图 */
   #view-kanban { display:none; }
@@ -204,7 +217,8 @@
 </style>
 
 <script>
-let DATA=null, gantt=null, curView="Week", curTab="overview", curTaskId=null, editing=false;
+let DATA=null, curView="Week", curTab="overview", curTaskId=null, editing=false;
+const gantt = (typeof Gantt !== "undefined" && Gantt.getGanttInstance) ? Gantt.getGanttInstance() : null;
 const COLORS=["#4a6fa5","#7a9e7e","#b08552","#8a6f9e","#a05a7e","#5a8ea0"];
 const STATUS_TXT={todo:"待办",doing:"进行中",done:"已完成"};
 
@@ -234,7 +248,7 @@ async function load(){
   document.querySelectorAll(".viewbtn").forEach(b=>b.onclick=()=>{
     document.querySelectorAll(".viewbtn").forEach(x=>x.classList.remove("active"));
     b.classList.add("active");curView=b.dataset.mode;
-    if(gantt)gantt.change_view_mode(curView);
+    if(ganttInited)applyScale(curView);
   });
   document.getElementById("tab-overview").onclick=()=>switchTab("overview");
   document.getElementById("tab-kanban").onclick=()=>switchTab("kanban");
@@ -305,28 +319,79 @@ function render(){
   renderKanban(ts);
 }
 
-function renderGantt(ts,projs){
-  const pi={};projs.forEach((p,i)=>pi[p.id]=i%6);
-  const gtasks=ts.filter(t=>!t.done).map(t=>{
-    const due=t.due_date||addDays(t.start_date||t.created_at,7);
-    const start=t.start_date||t.created_at;
-    const di=dueInfo(t);
-    return {id:String(t.id),name:(t.is_milestone?"◆ ":"")+t.title,
-      start:start<=due?start:due, end:due===start?addDays(due,1):due,
-      progress:0, custom_class:di.overdue?"bar-overdue":di.soon?"bar-soon":`bar-color-${pi[t.project_id]??0}`};
-  });
-  const gEl=document.getElementById("gantt");
-  gEl.innerHTML="";
-  if(!gtasks.length){gEl.innerHTML='<div class="empty">暂无任务</div>';gantt=null;}
-  else{
-    gantt=new Gantt("#gantt",gtasks,{view_mode:curView,language:"zh",popup:false,column_width:30,bar_height:22,bar_corner_radius:3,padding:14});
-    document.querySelectorAll("#gantt .bar-wrapper").forEach(el=>{
-      el.style.cursor="pointer";
-      el.onclick=()=>{const id=+el.getAttribute("data-id");if(id)fillDetail(id);};
-    });
-  }
+let ganttInited=false;
+function applyScale(mode){
+  const g=gantt;
+  if(mode==="Day"){g.config.scale_unit="day";g.config.step=1;g.config.date_scale="%d日";g.config.subscales=[];}
+  else if(mode==="Week"){g.config.scale_unit="week";g.config.step=1;g.config.date_scale="%d日";g.config.subscales=[{unit:"day",step:1,date:"%d"}];}
+  else if(mode==="Month"){g.config.scale_unit="month";g.config.step=1;g.config.date_scale="%Y年%M";g.config.subscales=[{unit:"week",step:1,date:"%d日"}];}
+  else {g.config.scale_unit="quarter";g.config.step=1;g.config.date_scale="%Y年";g.config.subscales=[{unit:"month",step:1,date:"%M"}];}
+  g.render();
 }
-
+function renderGantt(ts,projs){
+  if(!gantt)return;
+  const g=gantt;
+  const today=localDate(new Date());
+  const data=[];
+  projs.forEach((p,pi)=>{
+    data.push({id:`p${p.id}`,text:`📁 ${p.name}`,open:true,type:"project",
+      progress:p.tasks.length?Math.round(p.tasks.filter(t=>t.done).length/p.tasks.length*100)/100:0,color_idx:pi%6});
+    ts.filter(t=>t.project_id===p.id&&!t.done).forEach(t=>{
+      const di=dueInfo(t);
+      const start=t.start_date||t.created_at;
+      const due=t.due_date||addDays(start,7);
+      const dur=Math.max(1,Math.round((Date.parse(due)-Date.parse(start))/864e5)+1);
+      data.push({id:String(t.id),text:(t.is_milestone?"◆ ":"")+t.title,
+        start_date:t.is_milestone?(t.due_date||due):start,
+        duration:t.is_milestone?1:dur,
+        type:t.is_milestone?"milestone":"task",
+        parent:`p${p.id}`,color_idx:pi%6,due_txt:(t.due_date||"").slice(5),start_txt:(t.is_milestone?(t.due_date||due):start).slice(5),
+        warn:di.overdue?"overdue":di.soon?"soon":null});
+    });
+  });
+  const el=document.getElementById("gantt");
+  el.style.height=Math.min(760,Math.max(300,data.length*30+70))+"px";
+  if(!ganttInited){
+    g.plugins({tooltip:true});
+    g.config.date_format="%Y-%m-%d";
+    g.config.row_height=30; g.config.scale_height=44;
+    g.config.readonly=true;
+    g.config.columns=[
+      {name:"text",label:"任务",tree:true,width:230},
+      {name:"start_date",label:"开始",align:"center",width:64,template:t=>t.start_txt||""},
+      {name:"due",label:"截止",align:"center",width:64,template:t=>t.due_txt||""},
+    ];
+    g.config.show_progress=false;
+    g.templates.task_class=(start,end,task)=>{
+      if(String(task.id).startsWith("p")) return "gantt_project_row";
+      const cls=[`pc${task.color_idx}`];
+      if(task.warn==="overdue")cls.push("g-overdue");
+      if(task.warn==="soon")cls.push("g-soon");
+      if(task.type==="milestone")cls.push("g-ms");
+      return cls.join(" ");
+    };
+    g.attachEvent("onTaskClick",(id)=>{
+      if(!String(id).startsWith("p")) fillDetail(+id);
+      return true;
+    });
+    g.init("gantt");
+    ganttInited=true;
+  }
+  g.clearAll();
+  g.parse({data,links:[]});
+  applyScale(curView);
+  drawTodayLine();
+}
+function drawTodayLine(){
+  const g=gantt, host=document.querySelector("#gantt .gantt_data_area");
+  document.querySelectorAll(".today_marker").forEach(el=>el.remove());
+  if(!host)return;
+  const x=g.posFromDate(new Date());
+  const line=document.createElement("div");
+  line.className="today_marker";
+  line.style.cssText=`position:absolute;left:${x}px;top:0;bottom:0;width:2px;background:var(--danger);opacity:.8;z-index:5;pointer-events:none;`;
+  host.appendChild(line);
+}
 function renderTable(ts){
   const tb=document.querySelector("#task-table tbody");
   tb.innerHTML="";
