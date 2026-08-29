@@ -149,6 +149,7 @@
   <button class="viewbtn" data-mode="Year">年</button>
   <button class="viewbtn addbtn" id="btn-add" style="background:var(--ok);color:#fff;border-color:var(--ok)">＋ 新建任务</button>
   <button class="viewbtn" id="btn-add-proj" style="background:#fff;">＋ 新建项目</button>
+  <button class="viewbtn" id="btn-fields" style="background:#fff;">⚙ 自定义字段</button>
 </div>
 
 <!-- 总览视图 -->
@@ -173,6 +174,21 @@
 
 <!-- 任务详情侧栏 -->
 <div id="detail"><button class="close" onclick="closeDetail()">×</button><div id="detail-body"></div></div>
+
+<!-- 字段管理弹窗 -->
+<div id="fields-mask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:60" onclick="closeFields()">
+  <div onclick="event.stopPropagation()" style="position:absolute;top:10%;left:50%;transform:translateX(-50%);width:420px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <h3 style="margin-bottom:6px">⚙ 自定义字段</h3>
+    <div style="font-size:12px;color:#7f8c8d;margin-bottom:12px">为任务添加额外属性（如：负责人、合同号、预算…），在任务详情侧栏编辑</div>
+    <div id="fields-list"></div>
+    <div class="tres-add" style="display:flex;gap:6px;margin-top:14px">
+      <input id="f-name" placeholder="字段名" style="flex:1">
+      <select id="f-type" style="flex:0 0 76px"><option value="text">文本</option><option value="number">数字</option><option value="date">日期</option><option value="select">单选</option></select>
+      <input id="f-options" placeholder="选项,逗号分隔" style="flex:0 0 120px;display:none">
+    </div>
+    <div class="mops"><button onclick="closeFields()">关闭</button><button class="primary" id="f-add">添加字段</button></div>
+  </div>
+</div>
 
 <!-- 项目弹窗 -->
 <div id="proj-mask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:60" onclick="closeProjModal()">
@@ -243,7 +259,7 @@ async function load(){
   document.getElementById("n-overdue").textContent=DATA.summary.overdue;
   const sel=document.getElementById("proj-filter");
   sel.innerHTML='<option value="all">全部项目</option>'+DATA.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
-  sel.onchange=()=>{render();};
+  sel.onchange=()=>{render();showRes(sel.value);};
   document.getElementById("status-filter").onchange=render;
   document.getElementById("search").oninput=render;
   document.getElementById("sort").onchange=render;
@@ -257,6 +273,11 @@ async function load(){
   document.getElementById("btn-add").onclick=openModal;
   document.getElementById("m-save").onclick=saveTask;
   document.getElementById("btn-add-proj").onclick=()=>openProjModal(null);
+  document.getElementById("btn-fields").onclick=openFields;
+  document.getElementById("f-add").onclick=addFieldUI;
+  document.getElementById("f-type").onchange=e=>{
+    document.getElementById("f-options").style.display=e.target.value==="select"?"":"none";
+  };
   document.getElementById("p-save").onclick=saveProject;
   renderStats();render();showRes(document.getElementById("proj-filter").value);
   if(curTaskId&&!editing)fillDetail(curTaskId);
@@ -473,6 +494,17 @@ function fillDetail(id){
     <input id="tr-value" placeholder="群名或链接" style="flex:1">
     <button onclick="addTaskResUI(${t.id})" style="flex:0 0 46px">＋</button>
   </div>`;
+  const cfs=DATA.fields||[];
+  if(cfs.length){
+    const cv=t.custom||{};
+    html+=`<h5>自定义字段</h5><div id="cfs-box">${
+      cfs.map(f=>{
+        const v=cv[String(f.id)]??"";
+        if(f.type==="select")return `<div class="res-item">${f.name}：<select data-fid="${f.id}"><option value=""></option>${(f.options||"").split(",").filter(Boolean).map(o=>`<option ${v===o?"selected":""}>${o}</option>`).join("")}</select></div>`;
+        return `<div class="res-item" style="display:flex;align-items:center;gap:6px">${f.name}：<input data-fid="${f.id}" type="${f.type==="date"?"date":f.type==="number"?"number":"text"}" value="${v}" style="flex:1;padding:4px 6px;border:1px solid #d0d4d8;border-radius:5px;font-size:12px"></div>`;
+      }).join("")
+    }</div><button class="viewbtn" style="width:100%;margin-top:8px" onclick="saveCustom(${t.id})">保存自定义字段</button>`;
+  }
   if(t.parent_id){
     const pt=findTask(t.parent_id);
     if(pt)html+=`<h5>父任务</h5><div class="timeline-item" style="cursor:pointer" onclick="fillDetail(${pt.id})">↖ [id=${pt.id}] ${pt.title}</div>`;
@@ -510,9 +542,60 @@ async function addTaskResUI(taskId){
   if(!r.ok)return alert("添加失败");
   await load();fillDetail(taskId);
 }
+async function saveCustom(taskId){
+  const patch={};
+  document.querySelectorAll("#cfs-box [data-fid]").forEach(el=>{
+    patch[el.dataset.fid]=el.value??"";
+  });
+  const r=await fetch(`/api/tasks/${taskId}/custom`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});
+  if(!r.ok)return alert("保存失败");
+  await load();fillDetail(taskId);
+}
 async function delTaskRes(rid,taskId){
   await fetch(`/api/task-resources/${rid}`,{method:"DELETE"});
   await load();fillDetail(taskId);
+}
+
+// ---------- 自定义字段 ----------
+function openFields(){
+  renderFieldsList();
+  document.getElementById("fields-mask").style.display="";
+}
+function closeFields(){document.getElementById("fields-mask").style.display="none";}
+function renderFieldsList(){
+  const list=document.getElementById("fields-list");
+  const fs=DATA.fields||[];
+  const typeTxt={text:"文本",number:"数字",date:"日期",select:"单选"};
+  list.innerHTML=fs.length?fs.map(f=>`<div class="res-item"><b>${f.name}</b> <span style="color:#7f8c8d">· ${typeTxt[f.type]}${f.type==="select"&&f.options?` · ${f.options}`:""}</span> <span style="cursor:pointer;color:#b0b6bc" onclick="delField(${f.id})">×</span></div>`).join(""):`<div class="res-item" style="color:#b0b6bc">（暂无自定义字段）</div>`;
+}
+async function delField(id){
+  if(!confirm("删除该字段定义？已填写的值会保留在任务数据中但不再显示。"))return;
+  await fetch(`/api/fields/${id}`,{method:"DELETE"});
+  load();renderFieldsList();
+}
+async function addFieldUI(){
+  const name=document.getElementById("f-name").value.trim();
+  if(!name)return alert("请填字段名");
+  const body={name,type:document.getElementById("f-type").value,options:document.getElementById("f-options").value.trim()};
+  const r=await fetch("/api/fields",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok){const e=await r.json().catch(()=>({}));return alert("添加失败："+(e.error||""));}
+  document.getElementById("f-name").value="";document.getElementById("f-options").value="";
+  await load();renderFieldsList();
+}
+
+// ---------- 项目资料增删 ----------
+async function addProjResUI(pid){
+  const type=(document.getElementById("pr-type")||{}).value||"wechat_group";
+  const value=(document.getElementById("pr-value")||{}).value?.trim();
+  const label=(document.getElementById("pr-label")||{}).value?.trim()||"";
+  if(!value)return alert("请填内容");
+  const r=await fetch(`/api/projects/${pid}/resources`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type,value,label})});
+  if(!r.ok)return alert("添加失败");
+  await load();showRes(String(pid));
+}
+async function delProjRes(rid,pid){
+  await fetch(`/api/resources/${rid}`,{method:"DELETE"});
+  await load();showRes(String(pid));
 }
 
 // ---------- 新建任务 ----------
@@ -623,13 +706,20 @@ async function deleteTaskUI(id){
 function showRes(v){
   const panel=document.getElementById("res-panel");
   const p=v==="all"?null:DATA.projects.find(x=>x.id===+v);
-  if(!p||(!p.resources.length&&!p.history.length)){panel.style.display="none";return;}
+  if(!p){panel.style.display="none";return;}
   panel.style.display="";
   document.getElementById("res-title").textContent=`📁 ${p.name} · 资料与历史`;
   let html="";
+  if(!p.resources.length)html+=`<div class="res-item" style="color:#b0b6bc">（暂无资料，用下方添加）</div>`;
   p.resources.forEach(r=>{
-    html+=`<div class="res-item">${r.type==="wechat_group"?"💬 微信群":r.type==="link"?"🔗":"📄"} ${r.label?r.label+" ":""}${r.type==="link"?`<a href="${r.value}" target="_blank">${r.value}</a>`:r.value}</div>`;
+    html+=`<div class="res-item">${r.type==="wechat_group"?"💬 微信群":r.type==="link"?"🔗":"📄"} ${r.label?r.label+" ":""}${r.type==="link"?`<a href="${r.value}" target="_blank">${r.value}</a>`:r.value} <span style="cursor:pointer;color:#b0b6bc" onclick="delProjRes(${r.id},${p.id})">×</span></div>`;
   });
+  html+=`<div class="tres-add" style="display:flex;gap:6px;margin-top:8px">
+    <select id="pr-type" style="flex:0 0 92px"><option value="wechat_group">微信群</option><option value="link">链接</option><option value="note">备注</option></select>
+    <input id="pr-label" placeholder="说明(可选)" style="flex:0 0 90px">
+    <input id="pr-value" placeholder="群名或链接" style="flex:1">
+    <button onclick="addProjResUI(${p.id})" style="flex:0 0 46px">＋</button>
+  </div>`;
   if(p.history.length)html+=`<div class="hist">${p.history.map(h=>`· ${h.date} ${h.summary}`).join("<br>")}</div>`;
   document.getElementById("res-body").innerHTML=html;
 }

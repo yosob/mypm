@@ -4,6 +4,7 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import path from "node:path";
 import * as db from "../db";
+import { getCustom as safeCustom } from "../db";
 import { APP_DIR } from "../paths";
 
 export function startWeb(port: number) {
@@ -22,11 +23,12 @@ export function startWeb(port: number) {
 		const taskRes = db.listTaskResources();
 		return c.json({
 			summary,
+			fields: db.listFields(),
 			projects: projects.map((p) => ({
 				...p,
 				tasks: tasks
 					.filter((t) => t.project_id === p.id)
-					.map((t) => ({ ...t, resources: taskRes.filter((r) => r.task_id === t.id) })),
+					.map((t) => ({ ...t, resources: taskRes.filter((r) => r.task_id === t.id), custom: safeCustom(t) })),
 				resources: db.listResources(p.id),
 				history: db.listHistory(p.id),
 			})),
@@ -107,6 +109,41 @@ export function startWeb(port: number) {
 	app.delete("/api/task-resources/:rid", (c) => {
 		return c.json({ ok: db.deleteTaskResource(Number(c.req.param("rid"))) });
 	});
+
+	// 自定义字段
+	app.get("/api/fields", (c) => c.json(db.listFields()));
+	app.post("/api/fields", async (c) => {
+		const b = await c.req.json<any>().catch(() => null);
+		try {
+			return c.json(db.createField(String(b?.name || ""), String(b?.type || "text"), String(b?.options || "")));
+		} catch (e) {
+			return c.json({ error: e instanceof Error ? e.message : "invalid" }, 400);
+		}
+	});
+	app.delete("/api/fields/:id", (c) => c.json({ ok: db.deleteField(Number(c.req.param("id"))) }));
+
+	// 任务自定义字段值
+	app.post("/api/tasks/:id/custom", async (c) => {
+		const id = Number(c.req.param("id"));
+		const b = await c.req.json<Record<string, string>>().catch(() => null);
+		if (!b) return c.json({ error: "invalid body" }, 400);
+		try {
+			db.setCustom(id, b);
+			return c.json(db.getTask(id));
+		} catch (e) {
+			return c.json({ error: e instanceof Error ? e.message : "invalid" }, 400);
+		}
+	});
+
+	// 项目资料增删
+	app.post("/api/projects/:id/resources", async (c) => {
+		const id = Number(c.req.param("id"));
+		const b = await c.req.json<any>().catch(() => null);
+		if (!b?.value || !["wechat_group", "link", "note"].includes(b.type || "")) return c.json({ error: "type 与 value 必填" }, 400);
+		db.addResource(id, b.type, String(b.value), b.label || "");
+		return c.json({ ok: true });
+	});
+	app.delete("/api/resources/:rid", (c) => c.json({ ok: db.deleteResource(Number(c.req.param("rid"))) }));
 
 	// 新建项目
 	app.post("/api/projects", async (c) => {

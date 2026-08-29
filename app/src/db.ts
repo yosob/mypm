@@ -67,6 +67,13 @@ CREATE TABLE IF NOT EXISTS task_resources(
   value TEXT NOT NULL,
   label TEXT DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS custom_fields(
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,            -- text | number | date | select
+  options TEXT DEFAULT '',       -- select 的逗号分隔选项
+  created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS settings(
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -80,6 +87,7 @@ function migrate(db: Database.Database) {
 		if (!cols.some((c) => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
 	};
 	addCol("tasks", "start_date", "start_date TEXT");
+	addCol("tasks", "custom_json", "custom_json TEXT");
 	addCol("projects", "end_date", "end_date TEXT");
 }
 
@@ -100,6 +108,7 @@ export type Task = {
 	description: string;
 	due_date: string | null;
 	start_date: string | null;
+	custom_json?: string | null;
 	is_milestone: number;
 	done: number;
 	done_at: string | null;
@@ -325,6 +334,10 @@ export function deleteTask(id: number): boolean {
 
 // ---------- resources / history ----------
 
+export function deleteResource(id: number): boolean {
+	return db.prepare("DELETE FROM resources WHERE id=?").run(id).changes > 0;
+}
+
 export function addResource(projectId: number, type: string, value: string, label = "") {
 	db.prepare("INSERT INTO resources(project_id, type, value, label) VALUES(?,?,?,?)").run(projectId, type, value, label);
 }
@@ -340,6 +353,42 @@ export function addHistory(projectId: number, summary: string, date?: string) {
 
 export function listHistory(projectId: number): HistoryItem[] {
 	return db.prepare("SELECT * FROM history WHERE project_id=? ORDER BY date DESC, id DESC").all(projectId) as HistoryItem[];
+}
+
+// ---------- custom fields ----------
+
+export type CustomField = { id: number; name: string; type: string; options: string; created_at: string };
+
+export function listFields(): CustomField[] {
+	return db.prepare("SELECT * FROM custom_fields ORDER BY id").all() as CustomField[];
+}
+
+export function createField(name: string, type: string, options = ""): CustomField {
+	if (!name.trim()) throw new Error("字段名不能为空");
+	if (!["text", "number", "date", "select"].includes(type)) throw new Error("类型须为 text/number/date/select");
+	const info = db.prepare("INSERT INTO custom_fields(name, type, options, created_at) VALUES(?,?,?,?)").run(name.trim(), type, options, today());
+	return db.prepare("SELECT * FROM custom_fields WHERE id=?").get(info.lastInsertRowid) as CustomField;
+}
+
+export function deleteField(id: number): boolean {
+	return db.prepare("DELETE FROM custom_fields WHERE id=?").run(id).changes > 0;
+}
+
+/** 读任务自定义值（损坏 JSON 容错为空对象） */
+export function getCustom(task: Task | { custom_json?: string | null }): Record<string, string> {
+	try {
+		return JSON.parse(task.custom_json || "{}") ?? {};
+	} catch {
+		return {};
+	}
+}
+
+export function setCustom(taskId: number, patch: Record<string, string>) {
+	const t = getTask(taskId);
+	if (!t) throw new Error("任务不存在");
+	const merged = { ...getCustom(t), ...patch };
+	for (const k of Object.keys(merged)) if (merged[k] === "" || merged[k] === undefined) delete merged[k];
+	db.prepare("UPDATE tasks SET custom_json=? WHERE id=?").run(JSON.stringify(merged), taskId);
 }
 
 // ---------- task resources ----------
