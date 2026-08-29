@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mypm 看板</title>
+<script src="https://cdn.jsdelivr.net/npm/frappe-gantt/dist/frappe-gantt.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt/dist/frappe-gantt.css">
+<style>
+  :root { --c1:#4a6fa5; --c2:#7a9e7e; --c3:#b08552; --c4:#8a6f9e; --danger:#c0392b; }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #f4f5f7; color: #2c3e50; padding: 20px; }
+  h1 { font-size: 20px; margin-bottom: 14px; }
+  .cards { display: flex; gap: 12px; margin-bottom: 16px; }
+  .card { background: #fff; border-radius: 8px; padding: 12px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); min-width: 120px; }
+  .card .num { font-size: 26px; font-weight: 600; }
+  .card .lbl { font-size: 12px; color: #7f8c8d; }
+  .card.warn .num { color: var(--danger); }
+  .toolbar { margin-bottom: 12px; display: flex; gap: 10px; align-items: center; }
+  select, button.viewbtn { padding: 6px 10px; border: 1px solid #d0d4d8; border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; }
+  button.viewbtn.active { background: var(--c1); color: #fff; border-color: var(--c1); }
+  .layout { display: flex; gap: 16px; align-items: flex-start; }
+  .gantt-wrap { background: #fff; border-radius: 8px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.08); overflow-x: auto; flex: 1; min-width: 0; }
+  .side { width: 360px; flex-shrink: 0; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eef0f2; }
+  th { background: #fafbfc; font-weight: 600; color: #7f8c8d; }
+  tr.done td { color: #b0b6bc; text-decoration: line-through; }
+  tr.overdue td.due { color: var(--danger); font-weight: 600; }
+  .pflag { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; color: #fff; margin-right: 6px; }
+  .res-panel { background: #fff; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-top: 14px; font-size: 13px; }
+  .res-panel h3 { font-size: 14px; margin-bottom: 8px; }
+  .res-item { padding: 4px 0; border-bottom: 1px dashed #eef0f2; }
+  .res-item a { color: var(--c1); }
+  .hist { margin-top: 6px; color: #7f8c8d; font-size: 12px; line-height: 1.6; }
+  .bar-color-0 { fill: var(--c1) !important; } .bar-color-1 { fill: var(--c2) !important; }
+  .bar-color-2 { fill: var(--c3) !important; } .bar-color-3 { fill: var(--c4) !important; }
+  .gantt .bar-label { font-size: 11px; }
+  .empty { color:#95a5a6; padding: 20px; text-align:center; background:#fff; border-radius:8px; }
+</style>
+</head>
+<body>
+<h1>📋 mypm 项目看板</h1>
+<div class="cards">
+  <div class="card"><div class="num" id="n-projects">-</div><div class="lbl">进行中项目</div></div>
+  <div class="card"><div class="num" id="n-soon">-</div><div class="lbl">7 天内到期</div></div>
+  <div class="card warn"><div class="num" id="n-overdue">-</div><div class="lbl">已逾期</div></div>
+</div>
+<div class="toolbar">
+  <select id="proj-filter"></select>
+  <button class="viewbtn" data-mode="Day">日</button>
+  <button class="viewbtn active" data-mode="Week">周</button>
+  <button class="viewbtn" data-mode="Month">月</button>
+</div>
+<div class="layout">
+  <div class="gantt-wrap"><div id="gantt"></div></div>
+  <div class="side">
+    <table id="task-table"><thead><tr><th></th><th>任务</th><th>截止</th></tr></thead><tbody></tbody></table>
+    <div class="res-panel" id="res-panel" style="display:none"><h3 id="res-title"></h3><div id="res-body"></div></div>
+  </div>
+</div>
+
+<script>
+let DATA = null, gantt = null, curView = "Week";
+
+const COLORS = ["#4a6fa5","#7a9e7e","#b08552","#8a6f9e","#a05a7e","#5a8ea0"];
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate()+n); return x.toISOString().slice(0,10); }
+
+async function load() {
+  DATA = await (await fetch("/api/dashboard")).json();
+  document.getElementById("n-projects").textContent = DATA.summary.projects;
+  document.getElementById("n-soon").textContent = DATA.summary.dueSoon;
+  document.getElementById("n-overdue").textContent = DATA.summary.overdue;
+  const sel = document.getElementById("proj-filter");
+  sel.innerHTML = '<option value="all">全部项目</option>' + DATA.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+  sel.onchange = () => { render(); showRes(sel.value); };
+  document.querySelectorAll(".viewbtn").forEach(b => b.onclick = () => {
+    document.querySelectorAll(".viewbtn").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active"); curView = b.dataset.mode;
+    if (gantt) gantt.change_view_mode(curView);
+  });
+  render(); showRes("all");
+}
+
+function visibleProjects() {
+  const v = document.getElementById("proj-filter").value;
+  return v === "all" ? DATA.projects : DATA.projects.filter(p => p.id === +v);
+}
+
+function render() {
+  const today = new Date().toISOString().slice(0,10);
+  const projs = visibleProjects();
+  // 甘特任务
+  const gtasks = [];
+  projs.forEach((p, pi) => {
+    p.tasks.filter(t=>!t.done).forEach(t => {
+      const due = t.due_date || addDays(t.created_at, 7);
+      gtasks.push({
+        id: String(t.id), name: (t.is_milestone?"◆ ":"") + t.title,
+        start: t.created_at <= due ? t.created_at : due,
+        end: due === t.created_at ? addDays(due,1) : due,
+        progress: 0, custom_class: "bar-color-" + (pi % 6)
+      });
+    });
+  });
+  const gEl = document.getElementById("gantt");
+  gEl.innerHTML = "";
+  if (!gtasks.length) { gEl.innerHTML = '<div class="empty">暂无任务</div>'; gantt = null; }
+  else {
+    gantt = new Gantt("#gantt", gtasks, {
+      view_mode: curView, language: "zh",
+      popup: false, column_width: 30, bar_height: 22, bar_corner_radius: 3, padding: 14
+    });
+  }
+  // 任务表
+  const tb = document.querySelector("#task-table tbody");
+  tb.innerHTML = "";
+  projs.forEach(p => p.tasks.forEach(t => {
+    const tr = document.createElement("tr");
+    if (t.done) tr.className = "done";
+    const overdue = !t.done && t.due_date && t.due_date < today;
+    if (overdue) tr.className = "overdue";
+    tr.innerHTML = `<td><input type="checkbox" ${t.done?"checked":""} data-id="${t.id}"></td>
+      <td><span class="pflag" style="background:${COLORS[p.id % 6]}">${p.name}</span>${t.is_milestone?"◆ ":""}${t.title}</td>
+      <td class="due">${t.due_date || ""}</td>`;
+    tr.querySelector("input").onchange = async (e) => {
+      await fetch(`/api/tasks/${e.target.dataset.id}/toggle`, {method:"POST"});
+      load();
+    };
+    tb.appendChild(tr);
+  }));
+}
+
+function showRes(v) {
+  const panel = document.getElementById("res-panel");
+  const p = v === "all" ? null : DATA.projects.find(x=>x.id===+v);
+  if (!p || (!p.resources.length && !p.history.length)) { panel.style.display = "none"; return; }
+  panel.style.display = "";
+  document.getElementById("res-title").textContent = `📁 ${p.name} · 资料与历史`;
+  let html = "";
+  p.resources.forEach(r => {
+    html += `<div class="res-item">${r.type==="wechat_group"?"💬 微信群":r.type==="link"?"🔗":"📄"} ${r.label?r.label+" ":""}${
+      r.type==="link" ? `<a href="${r.value}" target="_blank">${r.value}</a>` : r.value}</div>`;
+  });
+  if (p.history.length) html += `<div class="hist">${p.history.map(h=>`· ${h.date} ${h.summary}`).join("<br>")}</div>`;
+  document.getElementById("res-body").innerHTML = html;
+}
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
