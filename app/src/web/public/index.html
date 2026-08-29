@@ -460,7 +460,19 @@ function fillDetail(id){
       <button data-st="doing" class="${st==="doing"?"cur":""}">进行中</button>
       <button data-st="done" class="donebtn ${st==="done"?"cur":""}">已完成</button>
     </div>`;
-  if(t.description)html+=`<h5>描述</h5><div class="desc">${t.description}</div>`;
+  if(t.description)html+=`<h5>内容</h5><div class="desc">${t.description}</div>`;
+  const trs=t.resources||[];
+  html+=`<h5>任务资料（微信群/链接）</h5><div id="tres-box">${
+    trs.length?trs.map(r=>`<div class="res-item" data-rid="${r.id}">${tresIcon(r.type)} ${r.label?r.label+" ":""}${
+      r.type==="link"?`<a href="${r.value}" target="_blank">${r.value}</a>`:r.value
+    } <span class="del-res" style="cursor:pointer;color:#b0b6bc" onclick="delTaskRes(${r.id},${t.id})">×</span></div>`).join(""):`<div class="res-item" style="color:#b0b6bc">（无）</div>`
+  }</div>
+  <div class="tres-add" style="display:flex;gap:6px;margin-top:8px">
+    <select id="tr-type" style="flex:0 0 92px"><option value="wechat_group">微信群</option><option value="link">链接</option><option value="note">备注</option></select>
+    <input id="tr-label" placeholder="说明(可选)" style="flex:0 0 90px">
+    <input id="tr-value" placeholder="群名或链接" style="flex:1">
+    <button onclick="addTaskResUI(${t.id})" style="flex:0 0 46px">＋</button>
+  </div>`;
   if(t.parent_id){
     const pt=findTask(t.parent_id);
     if(pt)html+=`<h5>父任务</h5><div class="timeline-item" style="cursor:pointer" onclick="fillDetail(${pt.id})">↖ [id=${pt.id}] ${pt.title}</div>`;
@@ -488,6 +500,20 @@ function fillDetail(id){
   document.getElementById("detail").classList.add("open");
 }
 function closeDetail(){document.getElementById("detail").classList.remove("open");curTaskId=null;editing=false;}
+function tresIcon(type){return type==="wechat_group"?"💬":type==="link"?"🔗":"📝";}
+async function addTaskResUI(taskId){
+  const type=(document.getElementById("tr-type")||{}).value||"wechat_group";
+  const value=(document.getElementById("tr-value")||{}).value?.trim();
+  const label=(document.getElementById("tr-label")||{}).value?.trim()||"";
+  if(!value)return alert("请填内容");
+  const r=await fetch(`/api/tasks/${taskId}/resources`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type,value,label})});
+  if(!r.ok)return alert("添加失败");
+  await load();fillDetail(taskId);
+}
+async function delTaskRes(rid,taskId){
+  await fetch(`/api/task-resources/${rid}`,{method:"DELETE"});
+  await load();fillDetail(taskId);
+}
 
 // ---------- 新建任务 ----------
 function openModal(){

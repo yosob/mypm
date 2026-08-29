@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS agent_sessions(
   messages_json TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS task_resources(
+  id INTEGER PRIMARY KEY,
+  task_id INTEGER NOT NULL REFERENCES tasks(id),
+  type TEXT NOT NULL,            -- wechat_group | link | note
+  value TEXT NOT NULL,
+  label TEXT DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS settings(
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -333,6 +340,21 @@ export function addHistory(projectId: number, summary: string, date?: string) {
 
 export function listHistory(projectId: number): HistoryItem[] {
 	return db.prepare("SELECT * FROM history WHERE project_id=? ORDER BY date DESC, id DESC").all(projectId) as HistoryItem[];
+}
+
+// ---------- task resources ----------
+
+export function addTaskResource(taskId: number, type: string, value: string, label = "") {
+	db.prepare("INSERT INTO task_resources(task_id, type, value, label) VALUES(?,?,?,?)").run(taskId, type, value, label);
+}
+
+export function listTaskResources(taskId?: number): (Resource & { task_id: number })[] {
+	if (taskId) return db.prepare("SELECT * FROM task_resources WHERE task_id=? ORDER BY id").all(taskId) as any;
+	return db.prepare("SELECT * FROM task_resources ORDER BY task_id, id").all() as any;
+}
+
+export function deleteTaskResource(id: number): boolean {
+	return db.prepare("DELETE FROM task_resources WHERE id=?").run(id).changes > 0;
 }
 
 // ---------- pending updates（提取→确认 两段式） ----------

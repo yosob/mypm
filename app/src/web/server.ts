@@ -19,11 +19,14 @@ export function startWeb(port: number) {
 			dueSoon: tasks.filter((t) => !t.done && t.due_date && t.due_date >= today && t.due_date <= soon).length,
 			overdue: tasks.filter((t) => !t.done && t.due_date && t.due_date < today).length,
 		};
+		const taskRes = db.listTaskResources();
 		return c.json({
 			summary,
 			projects: projects.map((p) => ({
 				...p,
-				tasks: tasks.filter((t) => t.project_id === p.id),
+				tasks: tasks
+					.filter((t) => t.project_id === p.id)
+					.map((t) => ({ ...t, resources: taskRes.filter((r) => r.task_id === t.id) })),
 				resources: db.listResources(p.id),
 				history: db.listHistory(p.id),
 			})),
@@ -89,6 +92,20 @@ export function startWeb(port: number) {
 		const id = Number(c.req.param("id"));
 		const okDeleted = db.deleteProject(id);
 		return okDeleted ? c.json({ ok: true }) : c.json({ error: "not found" }, 404);
+	});
+
+	// 任务资料
+	app.post("/api/tasks/:id/resources", async (c) => {
+		const id = Number(c.req.param("id"));
+		const b = await c.req.json<any>().catch(() => null);
+		if (!db.getTask(id)) return c.json({ error: "task not found" }, 404);
+		if (!b?.value || !["wechat_group", "link", "note"].includes(b.type || "")) return c.json({ error: "type(wechat_group/link/note) 与 value 必填" }, 400);
+		db.addTaskResource(id, b.type, String(b.value), b.label || "");
+		return c.json({ ok: true });
+	});
+
+	app.delete("/api/task-resources/:rid", (c) => {
+		return c.json({ ok: db.deleteTaskResource(Number(c.req.param("rid"))) });
 	});
 
 	// 新建项目

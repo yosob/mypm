@@ -214,17 +214,25 @@ export const pmTools: AgentTool<any, any>[] = [
 	{
 		name: "add_resource",
 		label: "添加资料",
-		description: "登记项目资料：微信群名、文档链接等。type 取 wechat_group 或 link。",
+		description:
+			"登记资料：微信群名、文档链接等。type 取 wechat_group / link / note。默认挂到项目；用户明确说挂在某个任务上时传 task_id。",
 		parameters: Type.Object({
 			project: Type.String({ description: "项目名（支持模糊匹配）" }),
-			type: Type.String({ description: "wechat_group 或 link" }),
+			type: Type.String({ description: "wechat_group / link / note" }),
 			value: Type.String({ description: "群名或链接地址" }),
 			label: Type.Optional(Type.String({ description: "简短说明" })),
+			task_id: Type.Optional(Type.Number({ description: "挂到该任务而非项目（用户明确要求时才传）" })),
 		}),
 		executionMode: "sequential",
 		async execute(_id, params: any) {
 			const proj = db.findProject(params.project);
 			if (!proj) throw new Error(`找不到项目「${params.project}」`);
+			if (params.task_id) {
+				const t = db.getTask(params.task_id);
+				if (!t) throw new Error(`任务 ${params.task_id} 不存在`);
+				db.addTaskResource(params.task_id, params.type, params.value, params.label ?? "");
+				return ok(`已登记到「${proj.name}」任务「${t.title}」：${params.type === "wechat_group" ? "微信群" : params.type === "link" ? "链接" : "备注"} ${params.label ? params.label + " " : ""}${params.value}`);
+			}
 			db.addResource(proj.id, params.type, params.value, params.label ?? "");
 			return ok(
 				`已登记到「${proj.name}」：${params.type === "wechat_group" ? "微信群" : "链接"} ${params.label ? params.label + " " : ""}${params.value}`,
