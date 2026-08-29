@@ -35,6 +35,10 @@ cd app && npm run dev
 
 `ZAI_CODING_CN_API_KEY`（GLM）、`LARK_APP_ID/SECRET`（应用机器人）、`FEISHU_WEBHOOK`（备用提醒）、`REMIND_DAYS`（提醒窗口，默认7）、`PORT`（看板端口）
 
+## 换机/部署
+
+见 [DEPLOY.md](DEPLOY.md)（Windows→Mac/Linux 迁移三要素、自启动、常见坑）。
+
 ## 文档
 
 - FEATURES.md — 功能清单与 PM 软件对照
