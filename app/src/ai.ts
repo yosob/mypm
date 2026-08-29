@@ -1,17 +1,14 @@
 import { createModels } from "@earendil-works/pi-ai";
-import { localDate } from "./paths";
 import { zaiCodingCnProvider } from "@earendil-works/pi-ai/providers/zai-coding-cn";
-import dotenv from "dotenv";
-import path from "node:path";
-import { ROOT } from "./paths";
+import { config } from "./config";
+import { localDate } from "./paths";
 import type { ExtractedUpdate } from "./db";
 import { listProjects } from "./db";
 
-dotenv.config({ path: path.join(ROOT, ".env") });
-
 process.env.TZ = "Asia/Shanghai";
+process.env.ZAI_CODING_CN_API_KEY = config.glm.apiKey; // 内置智谱 provider 从该 env 取 key
 
-export const MODEL_ID = process.env.PM_MODEL || "glm-4.7";
+export const MODEL_ID = config.glm.model;
 
 export const models = createModels();
 models.setProvider(zaiCodingCnProvider());

@@ -19,6 +19,7 @@
 | 文件 | 职责 | 关键导出 |
 |---|---|---|
 | `paths.ts` | 目录常量（一切限制在项目目录内）、日志、`localDate()` 本地日期 | `ROOT, DB_PATH, log, localDate` |
+| `config.ts` | 单一配置加载：读根目录 config.json，`$ENV` 引用解析，默认值合并（.env 已退役） | `config, resolveEnvRef` |
 | `db.ts` | SQLite 全部读写：7 张表建表、CRUD、提取两段式（pending→apply 事务）、备份与完整性自恢复、会话/设置存取 | `db, listProjects, findProject, createTask, applyPending, backup, saveSession...` |
 | `ai.ts` | GLM 模型装配（pi 内置智谱 provider）+ 纪要提取器（单次 LLM 调用，固定 prompt → 严格 JSON，失败重试一次） | `models, model, streamFn, extractUpdates` |
 | `tools.ts` | **11 个 AgentTool**（AI 与数据之间唯一通道） | `pmTools` |

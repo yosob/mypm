@@ -3,9 +3,11 @@ import crypto from "node:crypto";
 import { makeAgent, askAgent } from "./agent";
 import { setSetting } from "./db";
 import { log } from "./paths";
+import { config } from "./config";
 
-const APP_ID = process.env.LARK_APP_ID || "";
-const APP_SECRET = process.env.LARK_APP_SECRET || "";
+const APP_ID = config.lark.appId;
+const APP_SECRET = config.lark.appSecret;
+const LARK_DOMAIN = config.lark.domain === "feishu" ? lark.Domain.Feishu : lark.Domain.Lark;
 const TIMEOUT_MS = 5 * 60 * 1000;
 
 const agents = new Map<string, { agent: any; queue: Promise<unknown> }>();
@@ -25,8 +27,8 @@ export function startLark() {
 		log("未配置 LARK_APP_ID/SECRET，跳过 Lark 桥");
 		return;
 	}
-	const client = new lark.Client({ appId: APP_ID, appSecret: APP_SECRET, domain: lark.Domain.Lark });
-	const wsClient = new lark.WSClient({ appId: APP_ID, appSecret: APP_SECRET, domain: lark.Domain.Lark, loggerLevel: lark.LoggerLevel.info });
+	const client = new lark.Client({ appId: APP_ID, appSecret: APP_SECRET, domain: LARK_DOMAIN });
+	const wsClient = new lark.WSClient({ appId: APP_ID, appSecret: APP_SECRET, domain: LARK_DOMAIN, loggerLevel: lark.LoggerLevel.info });
 
 	async function reply(messageId: string, text: string) {
 		// 超长分段（卡片显示 3000 字截断，按 2000 分段）

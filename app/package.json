@@ -15,7 +15,6 @@
     "@larksuiteoapi/node-sdk": "^1.73.0",
     "better-sqlite3": "^13.0.3",
     "dhtmlx-gantt": "^10.0.2",
-    "dotenv": "^16.5.0",
     "hono": "^4.7.0",
     "node-cron": "^3.0.3"
   },

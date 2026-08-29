@@ -1,14 +1,15 @@
 import { Agent } from "@earendil-works/pi-agent-core";
 import { localDate, log } from "./paths";
+import { config } from "./config";
 import { model, streamFn, summarizeHistory } from "./ai";
 import { pmTools } from "./tools";
 import { loadSession, saveSession, type SessionData } from "./db";
 
 process.env.TZ = "Asia/Shanghai";
 
-/** 会话管理参数（.env 可调）：超过 MAX 条触发压缩，压缩到最近 KEEP 条，其余并入滚动摘要 */
-const SESSION_MAX = Number(process.env.SESSION_MAX || 200);
-const SESSION_KEEP = Number(process.env.SESSION_KEEP || 50);
+/** 会话管理参数（config.json app 节）：超过 MAX 条触发压缩，压缩到最近 KEEP 条 */
+const SESSION_MAX = config.app.sessionMax;
+const SESSION_KEEP = config.app.sessionKeep;
 
 export function systemPrompt(): string {
 	const d = new Date();

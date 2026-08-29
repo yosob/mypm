@@ -1,5 +1,6 @@
 import * as db from "./db";
 import { localDate } from "./paths";
+import { config } from "./config";
 import { backup } from "./db";
 import { notifyCard } from "./notify";
 import { log } from "./paths";
@@ -10,7 +11,7 @@ import { log } from "./paths";
  */
 export async function runCheck(opts: { withBackup?: boolean } = {}) {
 	const today = localDate();
-	const days = Number(process.env.REMIND_DAYS || 7);
+	const days = config.app.remindDays;
 	const horizon = localDate(new Date(Date.now() + days * 86400_000));
 
 	const tasks = db.listTasks({ dueWithinDays: days }); // 含逾期（due <= today+N）

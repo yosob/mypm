@@ -8,7 +8,7 @@
 |---|---|---|
 | **代码** | git 仓库（推荐 clone/push）或整目录拷贝 | 不含 node_modules 也行，新机 `npm install` 重建 |
 | **数据** | `app/data/mypm.db`（+ `backups/`） | **迁移前先停服务**（WAL 未落盘会丢尾部数据） |
-| **配置** | `.env`（根目录） | gitignore 了不会随仓库走，需单独拷贝；内容全平台通用 |
+| **配置** | `config.json`（根目录） | gitignore 了不会随仓库走，需单独拷贝或按 `config.example.json` 重填（密钥可写明文或 `$环境变量` 引用） |
 
 可选：`logs/`（一般不要）、`ref/`、`pi-main/`（参考资料，可不带）。
 
@@ -39,7 +39,7 @@ npm install          # 重建依赖，better-sqlite3 会自动编译 Mac 原生�
 ### 3. 放数据与配置
 
 ```bash
-# .env 拷到项目根（内容无需改动）
+# config.json 拷到项目根（或复制 config.example.json 后填入）
 # 旧机的 app/data/mypm.db 拷到新机同路径（覆盖前确保新机服务未启动）
 ```
 
@@ -103,7 +103,7 @@ launchctl unload ~/Library/LaunchAgents/com.mypm.app.plist # 停用
 | 症状 | 原因/处理 |
 |---|---|
 | `npm install` 卡在 better-sqlite3 编译报错 | 缺编译链：Mac 装 Xcode CLT；Linux 装 build-essential；或换 `Node LTS 22`（有预编译包可免编译） |
-| 启动报 `Provider is not configured: zai-coding-cn` | `.env` 没拷/没在项目根；确认 `ZAI_CODING_CN_API_KEY` 在 |
+| 启动报 `Provider is not configured: zai-coding-cn` | `config.json` 缺失或 glm.apiKey 为空/其 $ENV 未定义；按 config.example.json 检查 |
 | Lark 收不到消息 | ① 日志有无 `Lark WebSocket 已连接`；② **旧机服务是否还开着**（分流事故）；③ 换网络后公司代理拦 wss |
 | 提醒/日期差一天 | 机器时区需为 Asia/Shanghai（`sudo systemsetup -settimezone Asia/Shanghai`） |
 | 看板想远程访问 | 监听是 127.0.0.1；用 frp/tailscale/cloudflare tunnel 转发 8787 端口（加鉴权后再公网） |

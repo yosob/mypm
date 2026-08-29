@@ -1,0 +1,21 @@
+{
+  "glm": {
+    "apiKey": "$ZAI_CODING_CN_API_KEY",
+    "model": "glm-4.7"
+  },
+  "lark": {
+    "appId": "cli_xxxxxxxx",
+    "appSecret": "$LARK_APP_SECRET",
+    "domain": "lark"
+  },
+  "notify": {
+    "webhook": "$FEISHU_WEBHOOK"
+  },
+  "app": {
+    "port": 8787,
+    "remindDays": 7,
+    "remindCron": "0 9 * * *",
+    "sessionMax": 200,
+    "sessionKeep": 50
+  }
+}

@@ -1,14 +1,14 @@
 import * as lark from "@larksuiteoapi/node-sdk";
 import { log } from "./paths";
 import { getSetting } from "./db";
+import { config } from "./config";
 
 let client: lark.Client | null = null;
 function larkClient(): lark.Client | null {
-	// 运行时读取（模块顶层的 process.env 可能早于 dotenv.config 执行）
-	const appId = process.env.LARK_APP_ID || "";
-	const appSecret = process.env.LARK_APP_SECRET || "";
+	const appId = config.lark.appId;
+	const appSecret = config.lark.appSecret;
 	if (!appId || !appSecret) return null;
-	if (!client) client = new lark.Client({ appId, appSecret, domain: lark.Domain.Lark });
+	if (!client) client = new lark.Client({ appId, appSecret, domain: config.lark.domain === "feishu" ? lark.Domain.Feishu : lark.Domain.Lark });
 	return client;
 }
 
@@ -44,7 +44,7 @@ export async function notifyCard(title: string, mdLines: string[], template = "b
 		}
 	}
 	// 通道2：群自定义机器人 Webhook
-	const webhook = process.env.FEISHU_WEBHOOK;
+	const webhook = config.notify.webhook;
 	if (webhook) {
 		try {
 			const r = await fetch(webhook, {

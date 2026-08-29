@@ -61,3 +61,10 @@
 26. `npm run chat` 终端模式：stdin 逐行 → agent.prompt()，与 Lark 共用同一 agent.ts 组装函数
 27. 测试数据：样例纪要内嵌于 app/scripts/e2e.ts；v2 验收用例 = DETAILS.md #11 的 8 条
 28. 旧进程处置：v2 全部验收通过后，关闭 Vikunja（exe）与 dsh（node）进程；v1 遗留（mypm.py/Vikunja/docker-compose/data）已于 2026-08-29 清理，prompt 参照 app/src/ai.ts
+
+## 决议 #29（2026-08-30）：配置体系改单一 config.json（pi 风格），.env 退役
+
+- 调研结论：主流 agent 项目（pi/nanobot/dsh）均以单一配置文件为入口，不用 .env
+- 采用 pi 精华：密钥字段值支持 `$VAR`/`${VAR}` 环境变量引用（`$$` 转义；未定义→空+警告）
+- config.json gitignore + config.example.json 模板提交；缺字段用内置默认；dotenv 依赖移除
+- 附带收益：cron 时刻/提醒窗口/会话参数全部可配；ESM import 早于 env 加载的时序坑根除

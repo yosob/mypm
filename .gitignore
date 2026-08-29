@@ -1,5 +1,5 @@
-# 密钥
-.env
+# 配置（含密钥，勿提交；模板见 config.example.json）
+config.json
 
 # 运行数据与备份
 app/data/
