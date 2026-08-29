@@ -49,4 +49,4 @@ cd app && npm run dev
 
 ## 历史
 
-v1（mypm.py + Vikunja）已退役，代码保留作参考；v2 为 pi agent + 自建数据层。
+v1（mypm.py + Vikunja）已退役并清理；v2 为 pi agent + 自建数据层。
