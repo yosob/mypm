@@ -77,3 +77,11 @@
   getModel 失败时列出可用模型清单后退出
 - 旧 glm{apiKey,model} 节自动迁移为 llm 节（向后兼容）
 - 切换模型 = 改 config.json 两行 + 重启，不动代码
+
+## 决议 #31（2026-08-30）：provider 完全统一，取消智谱内置特例
+
+- 用户反馈"内置 zai-coding-cn + custom[]"的心智模型抽象；改为所有厂家一律在
+  llm.providers[] 平等声明（智谱=普通一项，baseUrl/api/key/models 全显式）
+- ai.ts 移除 zaiCodingCnProvider 引用；registerCustom 是唯一注册路径
+- 旧配置兼容：llm{apiKey} / glm 节 → 自动合成 zhipu provider 项
+- README llm 节同步重写（顶层选厂家，providers[] 抄段即增厂家）

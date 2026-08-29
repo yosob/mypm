@@ -21,7 +21,7 @@
 | `paths.ts` | 目录常量（一切限制在项目目录内）、日志、`localDate()` 本地日期 | `ROOT, DB_PATH, log, localDate` |
 | `config.ts` | 单一配置加载：读根目录 config.json，`$ENV` 引用解析，默认值合并（.env 已退役） | `config, resolveEnvRef` |
 | `db.ts` | SQLite 全部读写：7 张表建表、CRUD、提取两段式（pending→apply 事务）、备份与完整性自恢复、会话/设置存取 | `db, listProjects, findProject, createTask, applyPending, backup, saveSession...` |
-| `ai.ts` | 多 provider 模型装配（内置智谱 + config.llm.custom 自定义端点，OpenAI/Anthropic 兼容）+ 纪要提取器 + 会话摘要压缩 | `models, model, streamFn, registerCustom, extractUpdates, summarizeHistory` |
+| `ai.ts` | 多 provider 模型装配（config.llm.providers 统一声明，智谱无特例，OpenAI/Anthropic 兼容）+ 纪要提取器 + 会话摘要压缩 | `models, model, streamFn, registerCustom, extractUpdates, summarizeHistory` |
 | `tools.ts` | **11 个 AgentTool**（AI 与数据之间唯一通道） | `pmTools` |
 | `agent.ts` | 用 pi Agent 组装会话：system prompt（含今天日期）、工具、会话持久化（agent_sessions 表：200 条上限，超限 GLM 滚动摘要压缩至最近 50 条，SESSION_MAX/KEEP 可配） | `makeAgent, askAgent, systemPrompt` |
 | `lark.ts` | Lark WebSocket 桥：收消息（私聊直通/群聊须@）、按 chat_id 哈希隔离会话、同会话串行、回复分段、"正在提取"提示、5 分钟超时、记住主人 open_id | `startLark` |

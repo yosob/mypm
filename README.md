@@ -62,24 +62,27 @@ npm run dev        # 启动；或 Windows 双击项目根 start-mypm.bat
 
 ### llm —— 用哪个 AI 模型
 
+所有模型厂家都在 `providers[]` 里平等声明（智谱也只是其中一家，无任何特殊处理）；顶层 `provider` + `model` 两个字段决定当前用哪家哪个模型。
+
+**顶层字段**
+
 | 字段 | 默认 | 说明 |
 |---|---|---|
-| `provider` | `zai-coding-cn` | 当前使用的 provider id：内置智谱，或 `custom[]` 里你自定义的 id |
+| `provider` | `zhipu` | 当前使用的厂家 id（必须对应 providers[] 里某项的 id） |
 | `model` | `glm-4.7` | 模型 id；填错启动时会列出全部可用模型再退出 |
-| `apiKey` | — | 仅当 provider 为内置 `zai-coding-cn` 时需要 |
-| `custom[]` | `[]` | 自定义模型端点列表，想接几家写几家 |
 
-`custom[]` 每项（用于接 DeepSeek / Kimi / Qwen / OpenRouter / 各种中转站）：
+**providers[] 每项（一个厂家一个对象，想接几家写几家）**
 
 | 字段 | 说明 |
 |---|---|
-| `id` | 自定义 provider 标识（provider 字段填它） |
-| `baseUrl` | API 端点，如 `https://api.deepseek.com/v1` |
-| `api` | 协议：`openai-completions`（绝大多数）或 `anthropic-messages`（Claude 协议/GLM-Anthropic 端点） |
-| `apiKey` | 该端点的密钥（支持 `$ENV`） |
+| `id` | 厂家标识，provider 字段填它 |
+| `name` | 显示名（可省略） |
+| `baseUrl` | API 端点，如 `https://open.bigmodel.cn/api/coding/paas/v4` |
+| `api` | 协议：`openai-completions`（智谱/DeepSeek/Kimi/Qwen/中转站等绝大多数）或 `anthropic-messages`（Claude 协议端点） |
+| `apiKey` | 该厂家的密钥（支持 `$ENV` 引用） |
 | `models[]` | 模型清单：`id`（必填）、`name`、`contextWindow`(默认128k)、`maxTokens`(默认8192) |
 
-**切换模型示例**：接 DeepSeek → `custom` 加一项 `{"id":"deepseek",...}` → 把顶层 `provider` 改 `"deepseek"`、`model` 改 `"deepseek-chat"` → 重启。
+**切换模型**：`provider` 改成另一家的 id、`model` 改成它 models 里的 id，重启即换（如 `deepseek` + `deepseek-chat`）。新增厂家 = providers[] 抄一段改 baseUrl/key/models。
 
 ### lark —— Lark/飞书 应用机器人
 

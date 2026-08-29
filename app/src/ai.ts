@@ -1,5 +1,4 @@
 import { createModels, createProvider, envApiKeyAuth, type Provider } from "@earendil-works/pi-ai";
-import { zaiCodingCnProvider } from "@earendil-works/pi-ai/providers/zai-coding-cn";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { config, type CustomProvider } from "./config";
@@ -35,18 +34,14 @@ export function registerCustom(c: CustomProvider): Provider<"openai-completions"
 	});
 }
 
-/** 组装模型目录：内置智谱 + config 声明的自定义 provider + 其他内置按 env 自动识别 */
+/** 组装模型目录：config.llm.providers 声明的每一家（智谱亦不特殊） */
 export const models = createModels();
-models.setProvider(zaiCodingCnProvider());
-for (const c of config.llm.custom ?? []) {
+for (const c of config.llm.providers ?? []) {
 	try {
 		models.setProvider(registerCustom(c));
 	} catch (e) {
-		console.error(`[ai] 自定义 provider "${c.id}" 注册失败:`, e instanceof Error ? e.message : e);
+		console.error(`[ai] provider "${c.id}" 注册失败:`, e instanceof Error ? e.message : e);
 	}
-}
-if (config.llm.provider === "zai-coding-cn" && config.llm.apiKey) {
-	process.env.ZAI_CODING_CN_API_KEY = config.llm.apiKey;
 }
 
 export const MODEL_ID = config.llm.model;

@@ -1,9 +1,18 @@
 {
   "llm": {
-    "provider": "zai-coding-cn",
+    "provider": "zhipu",
     "model": "glm-4.7",
-    "apiKey": "$ZAI_CODING_CN_API_KEY",
-    "custom": [
+    "providers": [
+      {
+        "id": "zhipu",
+        "name": "智谱 GLM",
+        "baseUrl": "https://open.bigmodel.cn/api/coding/paas/v4",
+        "api": "openai-completions",
+        "apiKey": "$ZAI_CODING_CN_API_KEY",
+        "models": [
+          { "id": "glm-4.7", "name": "GLM 4.7", "contextWindow": 128000, "maxTokens": 32000 }
+        ]
+      },
       {
         "id": "deepseek",
         "name": "DeepSeek",
@@ -12,16 +21,6 @@
         "apiKey": "$DEEPSEEK_API_KEY",
         "models": [
           { "id": "deepseek-chat", "name": "DeepSeek Chat", "contextWindow": 128000, "maxTokens": 8192 }
-        ]
-      },
-      {
-        "id": "glm-anthropic",
-        "name": "GLM Anthropic 兼容",
-        "baseUrl": "https://open.bigmodel.cn/api/anthropic",
-        "api": "anthropic-messages",
-        "apiKey": "$ZAI_CODING_CN_API_KEY",
-        "models": [
-          { "id": "glm-4.7", "name": "GLM 4.7 (Anthropic 协议)" }
         ]
       }
     ]

@@ -21,10 +21,9 @@ export type CustomProvider = {
 
 export type AppConfig = {
 	llm: {
-		provider: string; // 内置 provider id（如 zai-coding-cn/anthropic/openai）或 custom[].id
+		provider: string; // providers[] 中某一家的 id
 		model: string;
-		apiKey?: string; // 内置 provider 的 key（如智谱）；custom 的 key 在各自节点
-		custom?: CustomProvider[];
+		providers: CustomProvider[]; // 所有模型厂家都在这里声明（智谱也是普通一家）
 	};
 	lark: { appId: string; appSecret: string; domain: "lark" | "feishu" };
 	notify: { webhook: string };
@@ -32,7 +31,20 @@ export type AppConfig = {
 };
 
 const DEFAULTS: AppConfig = {
-	llm: { provider: "zai-coding-cn", model: "glm-4.7", apiKey: "", custom: [] },
+	llm: {
+		provider: "zhipu",
+		model: "glm-4.7",
+		providers: [
+			{
+				id: "zhipu",
+				name: "智谱 GLM",
+				baseUrl: "https://open.bigmodel.cn/api/coding/paas/v4",
+				api: "openai-completions",
+				apiKey: "",
+				models: [{ id: "glm-4.7", name: "GLM 4.7", contextWindow: 128000, maxTokens: 32000 }],
+			},
+		],
+	},
 	lark: { appId: "", appSecret: "", domain: "lark" },
 	notify: { webhook: "" },
 	app: { port: 8787, remindDays: 7, remindCron: "0 9 * * *", sessionMax: 200, sessionKeep: 50 },
@@ -83,12 +95,18 @@ if (!fs.existsSync(FILE)) {
 }
 const raw = JSON.parse(fs.readFileSync(FILE, "utf8"));
 const resolved = deepResolve(raw, "config");
-// 向后兼容：旧 glm{apiKey,model} 节 → llm{provider:zai-coding-cn,...}
+// 向后兼容：旧 glm{apiKey,model} 节 / llm{provider:"zai-coding-cn",apiKey} → 统一 providers 形态
 if (resolved.glm && !resolved.llm) {
-	resolved.llm = { provider: "zai-coding-cn", model: resolved.glm.model, apiKey: resolved.glm.apiKey };
+	resolved.llm = { provider: "zhipu", model: resolved.glm.model, apiKey: resolved.glm.apiKey };
+}
+if (resolved.llm?.apiKey) {
+	const zs = (DEFAULTS.llm.providers[0] as any);
+	resolved.llm.providers = [{ ...zs, apiKey: resolved.llm.apiKey }, ...(resolved.llm.custom ?? [])];
+	delete resolved.llm.apiKey;
+	delete resolved.llm.custom;
 }
 export const config: AppConfig = deepMerge(DEFAULTS, resolved);
 
 /** 关键密钥自检（缺失不阻断，由使用方给出明确错误） */
-if (config.llm.provider === "zai-coding-cn" && !config.llm.apiKey) log("config 警告: llm.apiKey 为空（AI 将不可用）");
+if (!config.llm.providers?.length) log("config 警告: llm.providers 为空（AI 将不可用）");
 if (!config.lark.appId || !config.lark.appSecret) log("config 警告: lark 凭证为空（Lark 桥将不启动）");
