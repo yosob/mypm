@@ -27,7 +27,7 @@
 | `notify.ts` | 提醒卡片推送：优先应用机器人私聊（im.message.create），备用群 Webhook | `notifyCard` |
 | `check.ts` | 提醒扫描：进 7 天窗口一次 + 逾期当天一次，reminders 表防重复；顺带每日备份 | `runCheck` |
 | `web/server.ts` | 看板 API：`GET /api/dashboard`、`POST /api/tasks/:id/toggle`、静态页 | `startWeb` |
-| `web/public/index.html` | 单页看板：汇总卡/项目过滤/甘特图/任务勾选/资料面板（无构建） | — |
+| `web/public/index.html` | 单页看板，三视图（dhtmlx甘特/任务列表/看板拖拽）、筛选排序搜索、任务与项目居中编辑弹窗、资料行内编辑、自定义字段（⚙管理+侧栏编辑），vendor 本地化（dhtmlx） | — |
 | `index.ts` | 总入口：Web + Lark 桥 + cron 9:00 + 启动检查 | `npm run dev` |
 | `chat.ts` | 终端对话模式（调试用，与 Lark 同一 agent 组装） | `npm run chat` |
 | `run-check.ts` | 手动触发提醒的 CLI | `npm run check` |
@@ -36,19 +36,21 @@
 
 ## 三、AI 工具清单（tools.ts，AI 操作数据的唯一方式）
 
-| 工具 | 参数（概要） | 用途 |
+| 工具 | 读/写 | 用途 |
 |---|---|---|
-| `list_projects` | — | 总览项目与任务 |
-| `list_tasks` | project? / due_within_days? / include_done? | 查询任务（返回带 id，逾期标记） |
-| `get_project_detail` | project | 项目详情：任务+资料+历史时间线 |
-| `propose_updates` | content（纪要原文） | **核心**：内部调提取器 LLM → 结构化拟更新存 pending_updates → 返回待确认清单 |
-| `apply_updates` | update_id | 用户确认后事务写入（幂等：pending→applied） |
-| `discard_updates` | update_id | 丢弃拟更新 |
-| `create_task` | project / title / due_date? / description? / is_milestone? | 单条添加（未指明项目→「日程安排」） |
-| `update_task` | task_id / due_date? / done? / title? | 改期/完成/改名 |
-| `add_resource` | project / type / value / label? | 登记微信群名、链接 |
+| `list_projects` | 读 | 项目总览（状态/目标/项目截止日；任务带排期与优先级） |
+| `list_tasks` | 读 | 任务查询（过滤+逾期标记，结果带 id） |
+| `get_project_detail` | 读 | 项目详情：任务+资料+历史 |
+| `get_task` | 读 | 单任务全量：排期/优先级/内容/任务级资料/自定义字段/父子 |
+| `propose_updates` | 写 | 纪要→拟更新（内部再调一次 GLM 提取，严格 JSON，重试 1 次） |
+| `apply_updates` / `discard_updates` | 写 | 确认入库（事务、幂等）/ 丢弃 |
+| `create_task` | 写 | 新建（排期/优先级/里程碑/备注） |
+| `update_task` | 写 | 改期/状态/完成/改名/优先级 |
+| `update_project` | 写 | 项目目标/状态/项目截止日 |
+| `add_resource` | 写 | 资料（项目级或任务级 task_id） |
+| `set_custom_field` | 写 | 自定义字段（模糊匹配字段名，未定义则引导） |
 
-写库工具全部 `executionMode: "sequential"`。**没有 delete 工具**（防误删，决议 #12）。
+写库工具全部 `executionMode: "sequential"`。共 **11 个工具**。**没有 delete 工具**——删除仅看板可做（防误删，决议 #12）。
 
 ## 四、两条核心数据流
 

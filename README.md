@@ -19,7 +19,7 @@ Lark 私聊 ⇄ lark.ts（WebSocket 长连接）
 cd app && npm run dev
 ```
 
-- 看板：http://127.0.0.1:8787
+- 看板：http://127.0.0.1:8787（📈甘特图/📋任务列表/🗂看板三视图；任务与项目居中弹窗编辑、资料增删改、⚙自定义字段）
 - Lark：直接私聊机器人（首次私聊自动记住你的身份，用于提醒推送）
 - 日志：`logs/mypm.log`、`logs/mypm-run.log`；备份：`backups/`（保留14份）
 
