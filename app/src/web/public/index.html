@@ -575,13 +575,13 @@ function fillDetail(id){
   const cfs=DATA.fields||[];
   if(cfs.length){
     const cv=t.custom||{};
-    html+=`<div class="dt-sec"><div class="sec-title">⚙ 自定义字段</div>${
+    html+=`<div class="dt-sec"><div class="sec-title">⚙ 自定义字段</div><div id="cfs-box">${
       cfs.map(f=>{
         const v=cv[String(f.id)]??"";
         if(f.type==="select")return `<div class="res-item" style="display:flex;align-items:center;gap:8px">${f.name}<select data-fid="${f.id}" style="flex:1;padding:4px 6px;border:1px solid #d0d4d8;border-radius:5px;font-size:12px"><option value=""></option>${(f.options||"").split(",").filter(Boolean).map(o=>`<option ${v===o?"selected":""}>${o}</option>`).join("")}</select></div>`;
         return `<div class="res-item" style="display:flex;align-items:center;gap:8px">${f.name}<input data-fid="${f.id}" type="${f.type==="date"?"date":f.type==="number"?"number":"text"}" value="${v}" style="flex:1;padding:4px 6px;border:1px solid #d0d4d8;border-radius:5px;font-size:12px"></div>`;
       }).join("")
-    }<button class="viewbtn" style="width:100%;margin-top:8px" onclick="saveCustom(${t.id})">保存</button></div>`;
+    }</div><button class="viewbtn" style="width:100%;margin-top:8px" onclick="saveCustom(${t.id})">保存</button></div>`;
   }
 
   const subs=DATA.projects.flatMap(x=>x.tasks).filter(x=>x.parent_id===t.id);
@@ -609,6 +609,11 @@ function fillDetail(id){
 
   const body=document.getElementById("detail-body");
   body.innerHTML=html;
+  const cfsBox=document.getElementById("cfs-box");
+  if(cfsBox){
+    cfsBox.addEventListener("focusin",()=>{editing=true;});
+    cfsBox.addEventListener("change",()=>{editing=true;});
+  }
   body.querySelectorAll(".dt-seg button[data-st]").forEach(b=>b.onclick=async()=>{
     await fetch(`/api/tasks/${id}/status`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:b.dataset.st})});
     load();
@@ -633,6 +638,7 @@ async function saveCustom(taskId){
   });
   const r=await fetch(`/api/tasks/${taskId}/custom`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(patch)});
   if(!r.ok)return alert("保存失败");
+  editing=false;
   await load();fillDetail(taskId);
 }
 let editingResKey=null;
