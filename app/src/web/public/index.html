@@ -184,6 +184,7 @@
       <label>状态</label><select id="p-status"><option value="active">推进中</option><option value="paused">已搁置</option><option value="done">已完成</option></select>
       <label>项目截止日</label><input id="p-end" type="date">
       <div class="mops"><button onclick="closeProjModal()">取消</button><button class="primary" id="p-save">保存</button></div>
+      <button id="p-del" class="dangerbtn" style="display:none">🗑 删除整个项目（含任务/资料/历史）</button>
     </div>
   </div>
 </div>
@@ -527,6 +528,9 @@ function openProjModal(p){
   document.getElementById("p-status").value=p?p.status:"active";
   document.getElementById("p-end").value=p?(p.end_date||""):"";
   document.getElementById("proj-mask").style.display="";
+  const delBtn=document.getElementById("p-del");
+  delBtn.style.display=p?"":"none";
+  delBtn.onclick=deleteProjectUI;
   document.getElementById("p-name").focus();
 }
 function closeProjModal(){document.getElementById("proj-mask").style.display="none";}
@@ -544,6 +548,16 @@ async function saveProject(){
 function editProject(id){
   const p=DATA.projects.find(x=>x.id===id);
   if(p)openProjModal(p);
+}
+async function deleteProjectUI(){
+  if(!editingProjId)return;
+  const p=DATA.projects.find(x=>x.id===editingProjId);
+  if(!p)return;
+  if(!confirm(`确定删除项目「${p.name}」？
+其下所有任务、资料、历史将一并删除，不可恢复！`))return;
+  const r=await fetch(`/api/projects/${editingProjId}`,{method:"DELETE"});
+  if(!r.ok)return alert("删除失败");
+  closeProjModal();load();
 }
 
 // ---------- 编辑 / 删除 ----------

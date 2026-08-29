@@ -205,6 +205,18 @@ export function updateProject(id: number, patch: { name?: string; description?: 
 	return db.prepare("SELECT * FROM projects WHERE id=?").get(id) as Project;
 }
 
+export function deleteProject(id: number): boolean {
+	const del = db.transaction(() => {
+		db.prepare("DELETE FROM reminders WHERE task_id IN (SELECT id FROM tasks WHERE project_id=?)").run(id);
+		db.prepare("DELETE FROM tasks WHERE project_id=?").run(id);
+		db.prepare("DELETE FROM resources WHERE project_id=?").run(id);
+		db.prepare("DELETE FROM history WHERE project_id=?").run(id);
+		const n = db.prepare("DELETE FROM projects WHERE id=?").run(id).changes;
+		return n > 0;
+	});
+	return del();
+}
+
 export function setDescription(projectId: number, description: string) {
 	db.prepare("UPDATE projects SET description=? WHERE id=?").run(description, projectId);
 }

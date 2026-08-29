@@ -84,6 +84,13 @@ export function startWeb(port: number) {
 		return c.json(t);
 	});
 
+	// 删除项目（连同任务/资料/历史）
+	app.delete("/api/projects/:id", (c) => {
+		const id = Number(c.req.param("id"));
+		const okDeleted = db.deleteProject(id);
+		return okDeleted ? c.json({ ok: true }) : c.json({ error: "not found" }, 404);
+	});
+
 	// 新建项目
 	app.post("/api/projects", async (c) => {
 		const b = await c.req.json<any>().catch(() => null);
