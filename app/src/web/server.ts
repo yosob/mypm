@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { localDate } from "../paths";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import path from "node:path";
@@ -10,8 +11,8 @@ export function startWeb(port: number) {
 
 	app.get("/api/dashboard", (c) => {
 		const projects = db.listProjects();
-		const today = new Date().toISOString().slice(0, 10);
-		const soon = new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10);
+		const today = localDate();
+		const soon = localDate(new Date(Date.now() + 7 * 86400_000));
 		const tasks = db.listTasks({ includeDone: true });
 		const summary = {
 			projects: projects.length,

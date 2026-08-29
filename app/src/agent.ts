@@ -1,4 +1,5 @@
 import { Agent } from "@earendil-works/pi-agent-core";
+import { localDate } from "./paths";
 import { model, streamFn } from "./ai";
 import { pmTools } from "./tools";
 import { loadSession, saveSession } from "./db";
@@ -8,7 +9,7 @@ process.env.TZ = "Asia/Shanghai";
 export function systemPrompt(): string {
 	const d = new Date();
 	const week = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
-	return `你是 yosob 的个人项目管理助手（AI PM）。今天日期：${d.toISOString().slice(0, 10)} 星期${week}。你通过工具操作一个本地项目库。
+	return `你是 yosob 的个人项目管理助手（AI PM）。今天日期：${localDate(d)} 星期${week}。你通过工具操作一个本地项目库。
 
 行为规则：
 1. 绝不编造数据。任何项目/任务信息必须来自工具返回结果。
@@ -18,7 +19,8 @@ export function systemPrompt(): string {
 5. 用户要求改期/完成/重命名：调 update_task；不知道 task_id 就先 list_tasks 查。
 6. 用户提到微信群名、文档链接等资料：调 add_resource 挂到对应项目。
 7. 相对日期（下周三、月底）先按今天日期换算成 YYYY-MM-DD 再传参。
-8. 回复用简洁中文，列表优先，不寒暄。不确定用户意图时，列出可做的操作让用户选，不要自作主张写库。`;
+8. 用户没有指明项目时，任务放入「日程安排」项目（没有就创建），不要猜测归属某个现有项目；用户明确说了项目才归入对应项目。
+9. 回复用简洁中文，列表优先，不寒暄。不确定用户意图时，列出可做的操作让用户选，不要自作主张写库。`;
 }
 
 /** 每个会话（Lark chat / 终端）一个 Agent 实例 */

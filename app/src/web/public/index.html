@@ -64,7 +64,8 @@
 let DATA = null, gantt = null, curView = "Week";
 
 const COLORS = ["#4a6fa5","#7a9e7e","#b08552","#8a6f9e","#a05a7e","#5a8ea0"];
-function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate()+n); return x.toISOString().slice(0,10); }
+function localDate(d) { return new Intl.DateTimeFormat("en-CA",{year:"numeric",month:"2-digit",day:"2-digit"}).format(d); }
+function addDays(dstr, n) { const x = new Date(dstr + "T12:00:00"); x.setDate(x.getDate()+n); return localDate(x); }
 
 async function load() {
   DATA = await (await fetch("/api/dashboard")).json();
@@ -88,7 +89,7 @@ function visibleProjects() {
 }
 
 function render() {
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDate(new Date());
   const projs = visibleProjects();
   // 甘特任务
   const gtasks = [];

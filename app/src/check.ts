@@ -1,4 +1,5 @@
 import * as db from "./db";
+import { localDate } from "./paths";
 import { backup } from "./db";
 import { notifyCard } from "./notify";
 import { log } from "./paths";
@@ -8,9 +9,9 @@ import { log } from "./paths";
  * 逾期当天再提醒一次（kind=overdue）。已提醒过的不再重复。
  */
 export async function runCheck(opts: { withBackup?: boolean } = {}) {
-	const today = new Date().toISOString().slice(0, 10);
+	const today = localDate();
 	const days = Number(process.env.REMIND_DAYS || 7);
-	const horizon = new Date(Date.now() + days * 86400_000).toISOString().slice(0, 10);
+	const horizon = localDate(new Date(Date.now() + days * 86400_000));
 
 	const tasks = db.listTasks({ dueWithinDays: days }); // 含逾期（due <= today+N）
 	const windowLines: string[] = [];

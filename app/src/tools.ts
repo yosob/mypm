@@ -1,4 +1,5 @@
 import { Type } from "@earendil-works/pi-ai";
+import { localDate } from "./paths";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import * as db from "./db";
 import { extractUpdates } from "./ai";
@@ -9,7 +10,7 @@ function ok(text: string) {
 
 function fmtTask(t: db.Task): string {
 	const flags = [t.is_milestone ? "◆里程碑" : "", t.done ? "✅已完成" : ""].filter(Boolean).join(" ");
-	const overdue = !t.done && t.due_date && t.due_date < new Date().toISOString().slice(0, 10) ? "【逾期】" : "";
+	const overdue = !t.done && t.due_date && t.due_date < localDate() ? "【逾期】" : "";
 	return `[id=${t.id}] ${t.project_name} ｜ ${t.title}${t.due_date ? ` ｜ 截止 ${t.due_date}` : ""}${flags ? ` ｜ ${flags}` : ""} ${overdue}`.trim();
 }
 

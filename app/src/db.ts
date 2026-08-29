@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { localDate } from "./paths";
 import fs from "node:fs";
 import path from "node:path";
 import { DB_PATH, BACKUP_DIR, log } from "./paths";
@@ -105,7 +106,7 @@ export type ExtractedUpdate = {
 };
 
 function today(): string {
-	return new Date().toISOString().slice(0, 10);
+	return localDate();
 }
 
 function openDb(): Database.Database {
@@ -146,7 +147,9 @@ function latestBackup(): string | null {
 
 export function backup() {
 	const dest = path.join(BACKUP_DIR, `mypm-${today().replace(/-/g, "")}.db`);
-	db.prepare("VACUUM INTO ?").run(dest);
+	if (!fs.existsSync(dest)) {
+		db.prepare("VACUUM INTO ?").run(dest);
+	}
 	// 保留最近 14 份
 	const files = fs.readdirSync(BACKUP_DIR).filter((f) => /^mypm-\d{8}\.db$/.test(f)).sort();
 	for (const f of files.slice(0, Math.max(0, files.length - 14))) fs.unlinkSync(path.join(BACKUP_DIR, f));

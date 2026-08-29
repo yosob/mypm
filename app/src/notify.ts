@@ -2,13 +2,13 @@ import * as lark from "@larksuiteoapi/node-sdk";
 import { log } from "./paths";
 import { getSetting } from "./db";
 
-const APP_ID = process.env.LARK_APP_ID || "";
-const APP_SECRET = process.env.LARK_APP_SECRET || "";
-
 let client: lark.Client | null = null;
 function larkClient(): lark.Client | null {
-	if (!APP_ID || !APP_SECRET) return null;
-	if (!client) client = new lark.Client({ appId: APP_ID, appSecret: APP_SECRET, domain: lark.Domain.Lark });
+	// 运行时读取（模块顶层的 process.env 可能早于 dotenv.config 执行）
+	const appId = process.env.LARK_APP_ID || "";
+	const appSecret = process.env.LARK_APP_SECRET || "";
+	if (!appId || !appSecret) return null;
+	if (!client) client = new lark.Client({ appId, appSecret, domain: lark.Domain.Lark });
 	return client;
 }
 

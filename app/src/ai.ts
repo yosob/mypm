@@ -1,4 +1,5 @@
 import { createModels } from "@earendil-works/pi-ai";
+import { localDate } from "./paths";
 import { zaiCodingCnProvider } from "@earendil-works/pi-ai/providers/zai-coding-cn";
 import dotenv from "dotenv";
 import path from "node:path";
@@ -71,7 +72,7 @@ export async function completeText(systemPrompt: string, userContent: string): P
 /** 纪要 → 结构化拟更新。失败自动重试一次。 */
 export async function extractUpdates(content: string): Promise<ExtractedUpdate> {
 	const names = listProjects().map((p) => `- ${p.name}`).join("\n") || "（暂无项目）";
-	const prompt = EXTRACT_PROMPT.replace("{today}", new Date().toISOString().slice(0, 10))
+	const prompt = EXTRACT_PROMPT.replace("{today}", localDate())
 		.replace("{projects}", names)
 		.replace("{content}", content);
 

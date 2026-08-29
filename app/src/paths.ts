@@ -19,3 +19,8 @@ export function log(msg: string) {
 	console.log(line);
 	fs.appendFileSync(LOG_FILE, line + "\n", "utf8");
 }
+
+/** 本地（Asia/Shanghai）日期 YYYY-MM-DD，避免 UTC 与北京时间差一天 */
+export function localDate(d: Date = new Date()): string {
+	return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
