@@ -47,13 +47,62 @@
 
 ```bash
 # 0) 准备：Node ≥22、一个 Lark 自建应用（机器人+长连接）、GLM API Key
-# 1) 配置：按 .env.example 填 .env（GLM/Lark 凭证）
+# 1) 配置：复制 config.example.json 为 config.json，填入密钥（见下方"配置说明"）
 cd app && npm install
 npm run dev        # 启动；或 Windows 双击项目根 start-mypm.bat
 ```
 
 - 看板：http://127.0.0.1:8787 ｜ Lark：私聊机器人说句"你好"（首次私聊会记住你，用于提醒推送）
 - 日志 `logs/`，备份 `backups/`，数据 `app/data/mypm.db`
+
+## 配置说明（config.json）
+
+唯一配置文件，在项目根目录（**已被 gitignore，含密钥勿提交**；模板见 `config.example.json`）。
+任何密钥字段的值都可以直接写明文，或写 `"$环境变量名"` 引用（`$$` 转义字面美元符；引用的变量未定义时该值为空并在日志警告）——本地单人明文省事，部署/开源时全部 env 化。改完重启生效。
+
+### llm —— 用哪个 AI 模型
+
+| 字段 | 默认 | 说明 |
+|---|---|---|
+| `provider` | `zai-coding-cn` | 当前使用的 provider id：内置智谱，或 `custom[]` 里你自定义的 id |
+| `model` | `glm-4.7` | 模型 id；填错启动时会列出全部可用模型再退出 |
+| `apiKey` | — | 仅当 provider 为内置 `zai-coding-cn` 时需要 |
+| `custom[]` | `[]` | 自定义模型端点列表，想接几家写几家 |
+
+`custom[]` 每项（用于接 DeepSeek / Kimi / Qwen / OpenRouter / 各种中转站）：
+
+| 字段 | 说明 |
+|---|---|
+| `id` | 自定义 provider 标识（provider 字段填它） |
+| `baseUrl` | API 端点，如 `https://api.deepseek.com/v1` |
+| `api` | 协议：`openai-completions`（绝大多数）或 `anthropic-messages`（Claude 协议/GLM-Anthropic 端点） |
+| `apiKey` | 该端点的密钥（支持 `$ENV`） |
+| `models[]` | 模型清单：`id`（必填）、`name`、`contextWindow`(默认128k)、`maxTokens`(默认8192) |
+
+**切换模型示例**：接 DeepSeek → `custom` 加一项 `{"id":"deepseek",...}` → 把顶层 `provider` 改 `"deepseek"`、`model` 改 `"deepseek-chat"` → 重启。
+
+### lark —— Lark/飞书 应用机器人
+
+| 字段 | 说明 |
+|---|---|
+| `appId` / `appSecret` | 自建应用凭证（开放平台 → 凭证与基础信息） |
+| `domain` | `lark`（国际版）或 `feishu`（国内飞书） |
+
+### notify —— 提醒备用通道
+
+| 字段 | 说明 |
+|---|---|
+| `webhook` | 群自定义机器人 Webhook（机器人私聊失败时的兜底；可留空） |
+
+### app —— 行为参数
+
+| 字段 | 默认 | 说明 |
+|---|---|---|
+| `port` | `8787` | 看板端口 |
+| `remindDays` | `7` | 提前 N 天进入提醒窗口 |
+| `remindCron` | `0 9 * * *` | 每日提醒时刻（cron 表达式，默认每天 9:00） |
+| `sessionMax` | `200` | 会话原始消息条数上限，超过触发压缩 |
+| `sessionKeep` | `50` | 压缩后保留的最近消息条数（其余并入 AI 滚动摘要） |
 
 ## 日常就三招
 
