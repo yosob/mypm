@@ -1,5 +1,9 @@
 # mypm — 你的 AI 项目经理
 
+[![CI](https://github.com/YOUR_REPO/actions/workflows/ci.yml/badge.svg)](../../actions) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+[English](README.en.md) | **简体中文**
+
 > 一个跑在自己电脑上的 AI 项目管理助手：**你在 Lark 里跟它聊天，它替你管项目、记任务、盯截止日、到点提醒你**。不用装 App、不要公网服务器，数据全在自己手里。
 
 ## 这是什么？
@@ -135,3 +139,11 @@ npm run dev        # 启动；或 Windows 双击项目根 start-mypm.bat
 ## 历史
 
 v1（Vikunja + 脚本）已退役清理；v2 为 pi agent + 自建数据层的 AI native 重写。
+
+## License
+
+[MIT](LICENSE)
+
+## 目录里的"本地资产"说明
+
+以下内容是开发者本机文件，**不随 git 分发**（已 gitignore）：`config.json`（含密钥）、`app/data/`（数据库）、`backups/`、`logs/`、`ref/`、`pi-main/`、`app/scripts/`（开发测试脚本）。克隆本仓库后按「快速开始」三步即可获得完整可运行环境。

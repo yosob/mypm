@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        working-directory: app
+        run: npm ci
+      - name: Typecheck
+        working-directory: app
+        run: npm run typecheck
+      - name: Unit tests
+        working-directory: app
+        run: npm test
+        env:
+          # 模板中的 $ENV 占位在无环境变量时解析为空，单测不发起真实 LLM 调用
+          CI: true

@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "chat": "tsx src/chat.ts",
-    "check": "tsx src/run-check.ts"
+    "check": "tsx src/run-check.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx scripts/test-db.ts && tsx scripts/test-config.ts && tsx scripts/test-providers.ts",
+    "test:session": "tsx scripts/test-session.ts",
+    "test:web": "python scripts/debug-web.py"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.84.3",
@@ -24,5 +28,22 @@
     "@types/node-cron": "^3.0.11",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
+  },
+  "description": "AI-native personal project manager: chat with it on Lark/Feishu, it extracts meeting notes into tasks, tracks milestones, and reminds you. Local SQLite + web Gantt dashboard.",
+  "license": "MIT",
+  "author": "yanshibo",
+  "keywords": [
+    "ai-agent",
+    "project-management",
+    "lark",
+    "feishu",
+    "gantt",
+    "personal-assistant",
+    "pi-agent",
+    "glm",
+    "sqlite"
+  ],
+  "engines": {
+    "node": ">=22"
   }
 }
