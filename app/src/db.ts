@@ -223,6 +223,7 @@ export function updateProject(id: number, patch: { name?: string; description?: 
 
 export function deleteProject(id: number): boolean {
 	const del = db.transaction(() => {
+		db.prepare("DELETE FROM task_resources WHERE task_id IN (SELECT id FROM tasks WHERE project_id=?)").run(id);
 		db.prepare("DELETE FROM reminders WHERE task_id IN (SELECT id FROM tasks WHERE project_id=?)").run(id);
 		db.prepare("DELETE FROM tasks WHERE project_id=?").run(id);
 		db.prepare("DELETE FROM resources WHERE project_id=?").run(id);
@@ -329,7 +330,14 @@ export function updateTask(
 }
 
 export function deleteTask(id: number): boolean {
-	return db.prepare("DELETE FROM tasks WHERE id=?").run(id).changes > 0;
+	const del = db.transaction(() => {
+		db.prepare("DELETE FROM task_resources WHERE task_id=?").run(id);
+		db.prepare("DELETE FROM reminders WHERE task_id=?").run(id);
+		// 子任务的父引用置空
+		db.prepare("UPDATE tasks SET parent_id=NULL WHERE parent_id=?").run(id);
+		return db.prepare("DELETE FROM tasks WHERE id=?").run(id).changes > 0;
+	});
+	return del();
 }
 
 // ---------- resources / history ----------
