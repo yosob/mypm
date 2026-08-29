@@ -49,6 +49,43 @@ export function startWeb(port: number) {
 		return c.json(updated);
 	});
 
+	// 手动新建任务
+	app.post("/api/tasks", async (c) => {
+		const b = await c.req.json<any>().catch(() => null);
+		if (!b?.title || !b?.project_id) return c.json({ error: "title 与 project_id 必填" }, 400);
+		if (b.due_date && !/^\d{4}-\d{2}-\d{2}$/.test(b.due_date)) return c.json({ error: "due_date 需 YYYY-MM-DD" }, 400);
+		const t = db.createTask({
+			project_id: Number(b.project_id),
+			title: String(b.title),
+			due_date: b.due_date || null,
+			description: b.description || "",
+			is_milestone: !!b.is_milestone,
+		});
+		if (b.status && ["todo", "doing", "done"].includes(b.status)) db.updateTask(t.id, { status: b.status, done: b.status === "done" });
+		return c.json(db.getTask(t.id));
+	});
+
+	// 编辑任务
+	app.post("/api/tasks/:id/update", async (c) => {
+		const id = Number(c.req.param("id"));
+		const b = await c.req.json<any>().catch(() => null);
+		if (!db.getTask(id)) return c.json({ error: "not found" }, 404);
+		const patch: db.UpdatePatch = {};
+		if (b.title !== undefined) patch.title = String(b.title);
+		if (b.description !== undefined) patch.description = String(b.description);
+		if (b.due_date !== undefined) patch.due_date = b.due_date ? String(b.due_date) : null;
+		const t = db.updateTask(id, patch);
+		return c.json(t);
+	});
+
+	// 删除任务
+	app.delete("/api/tasks/:id", (c) => {
+		const id = Number(c.req.param("id"));
+		if (!db.getTask(id)) return c.json({ error: "not found" }, 404);
+		db.deleteTask(id);
+		return c.json({ ok: true });
+	});
+
 	app.use("/*", serveStatic({ root: path.join(APP_DIR, "src/web/public").replace(/\\/g, "/") }));
 
 	serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {

@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>mypm 看板</title>
-<script src="https://cdn.jsdelivr.net/npm/frappe-gantt/dist/frappe-gantt.min.js"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt/dist/frappe-gantt.css">
+<script src="vendor/frappe-gantt.umd.js"></script>
+<link rel="stylesheet" href="vendor/frappe-gantt.css">
 <style>
   :root { --c1:#4a6fa5; --danger:#c0392b; --warn:#d4a017; --ok:#27ae60; }
   * { box-sizing: border-box; margin: 0; }
@@ -134,6 +134,7 @@
   <button class="viewbtn active" data-mode="Week">周</button>
   <button class="viewbtn" data-mode="Month">月</button>
   <button class="viewbtn" data-mode="Year">年</button>
+  <button class="viewbtn addbtn" id="btn-add" style="background:var(--ok);color:#fff;border-color:var(--ok)">＋ 新建任务</button>
 </div>
 
 <!-- 总览视图 -->
@@ -159,8 +160,34 @@
 <!-- 任务详情侧栏 -->
 <div id="detail"><button class="close" onclick="closeDetail()">×</button><div id="detail-body"></div></div>
 
+<!-- 新建任务弹窗 -->
+<div id="modal-mask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:60" onclick="closeModal()">
+  <div id="modal" onclick="event.stopPropagation()" style="position:absolute;top:12%;left:50%;transform:translateX(-50%);width:400px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <h3 style="margin-bottom:14px">新建任务</h3>
+    <div class="mform">
+      <label>标题 *</label><input id="m-title" placeholder="要做什么？">
+      <label>项目 *</label><select id="m-project"></select>
+      <label>截止日</label><input id="m-due" type="date">
+      <label>状态</label><select id="m-status"><option value="todo">待办</option><option value="doing">进行中</option></select>
+      <label>里程碑</label><label style="font-weight:400"><input id="m-milestone" type="checkbox"> 关键节点（◆）</label>
+      <label>备注</label><textarea id="m-desc" rows="2"></textarea>
+      <div class="mops"><button onclick="closeModal()">取消</button><button class="primary" id="m-save">保存</button></div>
+    </div>
+  </div>
+</div>
+<style>
+  .mform label { display:block; font-size:12px; color:#7f8c8d; margin:10px 0 4px; }
+  .mform input, .mform select, .mform textarea { width:100%; padding:7px 9px; border:1px solid #d0d4d8; border-radius:6px; font-size:13px; font-family:inherit; }
+  .mops { display:flex; gap:10px; margin-top:18px; }
+  .mops button { flex:1; padding:8px 0; border-radius:6px; border:1px solid #d0d4d8; background:#fff; cursor:pointer; }
+  .mops .primary { background:var(--c1); color:#fff; border-color:var(--c1); }
+  #detail .editrow { margin:6px 0; }
+  #detail .editrow input, #detail .editrow textarea { width:100%; padding:6px 8px; border:1px solid #d0d4d8; border-radius:6px; font-size:13px; font-family:inherit; }
+  #detail .dangerbtn { width:100%; margin-top:18px; padding:7px 0; border-radius:6px; border:1px solid #e5b4b0; background:#fdf2f1; color:var(--danger); cursor:pointer; }
+</style>
+
 <script>
-let DATA=null, gantt=null, curView="Week", curTab="overview", curTaskId=null;
+let DATA=null, gantt=null, curView="Week", curTab="overview", curTaskId=null, editing=false;
 const COLORS=["#4a6fa5","#7a9e7e","#b08552","#8a6f9e","#a05a7e","#5a8ea0"];
 const STATUS_TXT={todo:"待办",doing:"进行中",done:"已完成"};
 
@@ -194,8 +221,10 @@ async function load(){
   });
   document.getElementById("tab-overview").onclick=()=>switchTab("overview");
   document.getElementById("tab-kanban").onclick=()=>switchTab("kanban");
+  document.getElementById("btn-add").onclick=openModal;
+  document.getElementById("m-save").onclick=saveTask;
   renderStats();render();showRes(document.getElementById("proj-filter").value);
-  if(curTaskId)fillDetail(curTaskId);
+  if(curTaskId&&!editing)fillDetail(curTaskId);
 }
 
 function switchTab(t){
@@ -261,7 +290,7 @@ function renderGantt(ts,projs){
     const di=dueInfo(t);
     return {id:String(t.id),name:(t.is_milestone?"◆ ":"")+t.title,
       start:t.created_at<=due?t.created_at:due, end:due===t.created_at?addDays(due,1):due,
-      progress:0, custom_class:`bar-color-${pi[t.project_id]??0}`+(di.overdue?" bar-overdue":di.soon?" bar-soon":"")};
+      progress:0, custom_class:di.overdue?"bar-overdue":di.soon?"bar-soon":`bar-color-${pi[t.project_id]??0}`};
   });
   const gEl=document.getElementById("gantt");
   gEl.innerHTML="";
@@ -330,7 +359,7 @@ function findTask(id){id=+id;for(const p of DATA.projects){const t=p.tasks.find(
 
 function fillDetail(id){
   const t=findTask(id);if(!t)return;
-  curTaskId=id;
+  curTaskId=id;editing=false;
   const p=findProj(t.project_id),di=dueInfo(t),st=statusOf(t);
   let html=`<h2>${t.is_milestone?"◆ ":""}${t.title}</h2>
     <div class="drow"><span class="pflag" style="background:${projColor(t.project_id)}">${p?p.name:""}</span> 创建于 ${t.created_at}</div>
@@ -350,15 +379,71 @@ function fillDetail(id){
       html+="<h5>会议/进展历史</h5>"+p.history.map(h=>`<div class="timeline-item"><b>${h.date}</b> ${h.summary}</div>`).join("");
     }
   }
+  html+=`<div class="ops"><button onclick="editDetail(${id})">✏️ 编辑</button><button class="danger" style="color:var(--danger)" onclick="deleteTaskUI(${id})">🗑 删除</button></div>`;
   const body=document.getElementById("detail-body");
   body.innerHTML=html;
-  body.querySelectorAll(".ops button").forEach(b=>b.onclick=async()=>{
+  body.querySelectorAll(".ops button[data-st]").forEach(b=>b.onclick=async()=>{
     await fetch(`/api/tasks/${id}/status`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:b.dataset.st})});
     load();
   });
   document.getElementById("detail").classList.add("open");
 }
-function closeDetail(){document.getElementById("detail").classList.remove("open");curTaskId=null;}
+function closeDetail(){document.getElementById("detail").classList.remove("open");curTaskId=null;editing=false;}
+
+// ---------- 新建任务 ----------
+function openModal(){
+  const sel=document.getElementById("m-project");
+  sel.innerHTML=DATA.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+  document.getElementById("m-title").value="";
+  document.getElementById("m-due").value="";
+  document.getElementById("m-status").value="todo";
+  document.getElementById("m-milestone").checked=false;
+  document.getElementById("m-desc").value="";
+  document.getElementById("modal-mask").style.display="";
+  document.getElementById("m-title").focus();
+}
+function closeModal(){document.getElementById("modal-mask").style.display="none";}
+async function saveTask(){
+  const title=document.getElementById("m-title").value.trim();
+  if(!title)return alert("请填标题");
+  const body={title,project_id:+document.getElementById("m-project").value,
+    due_date:document.getElementById("m-due").value||null,
+    status:document.getElementById("m-status").value,
+    is_milestone:document.getElementById("m-milestone").checked,
+    description:document.getElementById("m-desc").value.trim()};
+  const r=await fetch("/api/tasks",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok){const e=await r.json().catch(()=>({}));return alert("保存失败："+(e.error||r.status));}
+  closeModal();load();
+}
+
+// ---------- 编辑 / 删除 ----------
+function editDetail(id){
+  const t=findTask(id);if(!t)return;
+  curTaskId=id;editing=true;
+  document.getElementById("detail-body").innerHTML=`
+    <h2 style="margin-top:26px">编辑任务</h2>
+    <div class="editrow"><label style="font-size:12px;color:#7f8c8d">标题</label><input id="e-title" value="${t.title.replace(/"/g,"&quot;")}"></div>
+    <div class="editrow"><label style="font-size:12px;color:#7f8c8d">截止日</label><input id="e-due" type="date" value="${t.due_date||""}"></div>
+    <div class="editrow"><label style="font-size:12px;color:#7f8c8d">备注</label><textarea id="e-desc" rows="3">${t.description||""}</textarea></div>
+    <div class="ops">
+      <button onclick="fillDetail(${id})">取消</button>
+      <button class="cur" onclick="saveEdit(${id})">保存</button>
+    </div>`;
+}
+async function saveEdit(id){
+  const body={title:document.getElementById("e-title").value.trim()||undefined,
+    due_date:document.getElementById("e-due").value||null,
+    description:document.getElementById("e-desc").value};
+  const r=await fetch(`/api/tasks/${id}/update`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok)return alert("保存失败");
+  load();fillDetail(id);
+}
+async function deleteTaskUI(id){
+  if(!confirm("确定删除这个任务？不可恢复。"))return;
+  const r=await fetch(`/api/tasks/${id}`,{method:"DELETE"});
+  if(!r.ok)return alert("删除失败");
+  closeDetail();load();
+}
 
 function showRes(v){
   const panel=document.getElementById("res-panel");

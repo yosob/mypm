@@ -234,9 +234,11 @@ export function createTask(input: {
 	return getTask(info.lastInsertRowid as number)!;
 }
 
+export type UpdatePatch = { due_date?: string | null; done?: boolean; title?: string; description?: string; status?: string };
+
 export function updateTask(
 	id: number,
-	patch: { due_date?: string | null; done?: boolean; title?: string; description?: string; status?: string },
+	patch: UpdatePatch,
 ): Task | undefined {
 	const t = getTask(id);
 	if (!t) return undefined;
@@ -256,6 +258,10 @@ export function updateTask(
 		id,
 	);
 	return getTask(id);
+}
+
+export function deleteTask(id: number): boolean {
+	return db.prepare("DELETE FROM tasks WHERE id=?").run(id).changes > 0;
 }
 
 // ---------- resources / history ----------
