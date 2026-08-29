@@ -59,5 +59,5 @@
 
 25. Node 进程 `TZ=Asia/Shanghai`；日志同时写 console 与 `logs/mypm.log`（append，按周手动清理即可）
 26. `npm run chat` 终端模式：stdin 逐行 → agent.prompt()，与 Lark 共用同一 agent.ts 组装函数
-27. 测试数据：沿用 `sample-meeting.md`；v2 验收用例 = DETAILS.md #11 的 8 条
+27. 测试数据：样例纪要内嵌于 app/scripts/e2e.ts；v2 验收用例 = DETAILS.md #11 的 8 条
 28. 旧进程处置：v2 全部验收通过后，关闭 Vikunja（exe）与 dsh（node）进程；v1 遗留（mypm.py/Vikunja/docker-compose/data）已于 2026-08-29 清理，prompt 参照 app/src/ai.ts

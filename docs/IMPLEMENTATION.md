@@ -196,7 +196,7 @@ npm run check  # 手动触发提醒
 | 步骤 | 内容 | 验证 |
 |---|---|---|
 | 1 | 脚手架 + db.ts | 建表、CRUD 测试 |
-| 2 | agent.ts + tools.ts + `npm run chat` | 终端贴 sample-meeting.md → 清单 → "确认" → 落库 |
+| 2 | agent.ts + tools.ts + `npm run chat` | 终端贴样例纪要 → 清单 → "确认" → 落库 |
 | 3 | web 看板 | 甘特图/卡片/勾选正确 |
 | 4 | lark.ts | Lark 私聊走通同样流程 + "今天该干嘛" |
 | 5 | cron + notify | 手动 check 推飞书、不重复 |
