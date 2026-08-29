@@ -236,7 +236,7 @@ export function createTask(input: {
 
 export function updateTask(
 	id: number,
-	patch: { due_date?: string | null; done?: boolean; title?: string; description?: string },
+	patch: { due_date?: string | null; done?: boolean; title?: string; description?: string; status?: string },
 ): Task | undefined {
 	const t = getTask(id);
 	if (!t) return undefined;
@@ -244,12 +244,15 @@ export function updateTask(
 	const done = patch.done !== undefined ? (patch.done ? 1 : 0) : t.done;
 	const title = patch.title ?? t.title;
 	const desc = patch.description ?? t.description;
-	db.prepare("UPDATE tasks SET due_date=?, done=?, done_at=?, title=?, description=? WHERE id=?").run(
+	let status = patch.status ?? t.status;
+	if (patch.done !== undefined) status = patch.done ? "done" : status === "done" ? "todo" : status;
+	db.prepare("UPDATE tasks SET due_date=?, done=?, done_at=?, title=?, description=?, status=? WHERE id=?").run(
 		due,
 		done,
 		done ? today() : null,
 		title,
 		desc,
+		status,
 		id,
 	);
 	return getTask(id);

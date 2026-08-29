@@ -38,6 +38,17 @@ export function startWeb(port: number) {
 		return c.json(updated);
 	});
 
+	app.post("/api/tasks/:id/status", async (c) => {
+		const id = Number(c.req.param("id"));
+		const body = await c.req.json<{ status?: string }>().catch(() => ({}) as { status?: string });
+		const status = body.status;
+		if (!status || !["todo", "doing", "done"].includes(status)) return c.json({ error: "invalid status" }, 400);
+		const t = db.getTask(id);
+		if (!t) return c.json({ error: "not found" }, 404);
+		const updated = db.updateTask(id, { status, done: status === "done" ? true : false });
+		return c.json(updated);
+	});
+
 	app.use("/*", serveStatic({ root: path.join(APP_DIR, "src/web/public").replace(/\\/g, "/") }));
 
 	serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {

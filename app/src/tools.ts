@@ -9,9 +9,10 @@ function ok(text: string) {
 }
 
 function fmtTask(t: db.Task): string {
-	const flags = [t.is_milestone ? "◆里程碑" : "", t.done ? "✅已完成" : ""].filter(Boolean).join(" ");
+	const statusLabel = t.done || t.status === "done" ? "已完成" : t.status === "doing" ? "进行中" : "待办";
+	const flags = [t.is_milestone ? "◆里程碑" : ""].filter(Boolean).join(" ");
 	const overdue = !t.done && t.due_date && t.due_date < localDate() ? "【逾期】" : "";
-	return `[id=${t.id}] ${t.project_name} ｜ ${t.title}${t.due_date ? ` ｜ 截止 ${t.due_date}` : ""}${flags ? ` ｜ ${flags}` : ""} ${overdue}`.trim();
+	return `[id=${t.id}] ${t.project_name} ｜ ${t.title}${t.due_date ? ` ｜ 截止 ${t.due_date}` : ""} ｜ ${statusLabel}${flags ? ` ｜ ${flags}` : ""} ${overdue}`.trim();
 }
 
 function fmtProject(p: db.Project, withTasks = true): string {
@@ -156,12 +157,14 @@ export const pmTools: AgentTool<any, any>[] = [
 	{
 		name: "update_task",
 		label: "修改任务",
-		description: "改截止日/标记完成/改名时调用。需要任务id（可先用 list_tasks 查）。done 传 true 表示完成。",
+		description:
+			"改截止日/标记完成/改名/改状态时调用。需要任务id（可先用 list_tasks 查）。done 传 true 表示完成；status 取 todo(待办)/doing(进行中)/done(已完成)。",
 		parameters: Type.Object({
 			task_id: Type.Number({ description: "任务id" }),
 			due_date: Type.Optional(Type.String({ description: "新截止日 YYYY-MM-DD" })),
 			done: Type.Optional(Type.Boolean({ description: "是否完成" })),
 			title: Type.Optional(Type.String({ description: "新标题" })),
+			status: Type.Optional(Type.String({ description: "任务状态：todo/doing/done" })),
 		}),
 		executionMode: "sequential",
 		async execute(_id, params: any) {
@@ -169,6 +172,7 @@ export const pmTools: AgentTool<any, any>[] = [
 				due_date: params.due_date === undefined ? undefined : (params.due_date as string | null),
 				done: params.done,
 				title: params.title,
+				status: params.status,
 			});
 			if (!t) throw new Error(`任务 ${params.task_id} 不存在`);
 			return ok(`已更新：${fmtTask(t)}`);

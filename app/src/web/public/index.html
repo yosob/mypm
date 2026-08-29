@@ -7,148 +7,375 @@
 <script src="https://cdn.jsdelivr.net/npm/frappe-gantt/dist/frappe-gantt.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt/dist/frappe-gantt.css">
 <style>
-  :root { --c1:#4a6fa5; --c2:#7a9e7e; --c3:#b08552; --c4:#8a6f9e; --danger:#c0392b; }
+  :root { --c1:#4a6fa5; --danger:#c0392b; --warn:#d4a017; --ok:#27ae60; }
   * { box-sizing: border-box; margin: 0; }
-  body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #f4f5f7; color: #2c3e50; padding: 20px; }
-  h1 { font-size: 20px; margin-bottom: 14px; }
-  .cards { display: flex; gap: 12px; margin-bottom: 16px; }
-  .card { background: #fff; border-radius: 8px; padding: 12px 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); min-width: 120px; }
-  .card .num { font-size: 26px; font-weight: 600; }
-  .card .lbl { font-size: 12px; color: #7f8c8d; }
-  .card.warn .num { color: var(--danger); }
-  .toolbar { margin-bottom: 12px; display: flex; gap: 10px; align-items: center; }
-  select, button.viewbtn { padding: 6px 10px; border: 1px solid #d0d4d8; border-radius: 6px; background: #fff; font-size: 13px; cursor: pointer; }
-  button.viewbtn.active { background: var(--c1); color: #fff; border-color: var(--c1); }
-  .layout { display: flex; gap: 16px; align-items: flex-start; }
-  .gantt-wrap { background: #fff; border-radius: 8px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.08); overflow-x: auto; flex: 1; min-width: 0; }
-  .side { width: 360px; flex-shrink: 0; }
-  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); font-size: 13px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eef0f2; }
-  th { background: #fafbfc; font-weight: 600; color: #7f8c8d; }
-  tr.done td { color: #b0b6bc; text-decoration: line-through; }
-  tr.overdue td.due { color: var(--danger); font-weight: 600; }
-  .pflag { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; color: #fff; margin-right: 6px; }
-  .res-panel { background: #fff; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-top: 14px; font-size: 13px; }
-  .res-panel h3 { font-size: 14px; margin-bottom: 8px; }
-  .res-item { padding: 4px 0; border-bottom: 1px dashed #eef0f2; }
-  .res-item a { color: var(--c1); }
-  .hist { margin-top: 6px; color: #7f8c8d; font-size: 12px; line-height: 1.6; }
-  .bar-color-0 { fill: var(--c1) !important; } .bar-color-1 { fill: var(--c2) !important; }
-  .bar-color-2 { fill: var(--c3) !important; } .bar-color-3 { fill: var(--c4) !important; }
-  .gantt .bar-label { font-size: 11px; }
-  .empty { color:#95a5a6; padding: 20px; text-align:center; background:#fff; border-radius:8px; }
+  body { font-family: "Segoe UI","Microsoft YaHei",sans-serif; background:#f4f5f7; color:#2c3e50; padding:16px 20px; }
+  h1 { font-size: 20px; margin-bottom: 12px; display:flex; align-items:center; gap:14px; }
+  .tabs { display:inline-flex; background:#e8eaed; border-radius:8px; padding:3px; }
+  .tabs button { border:0; background:transparent; padding:5px 18px; border-radius:6px; cursor:pointer; font-size:14px; color:#5f6b76; }
+  .tabs button.active { background:#fff; color:var(--c1); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.1); }
+
+  .cards { display:flex; gap:12px; margin:12px 0; }
+  .card { background:#fff; border-radius:8px; padding:10px 18px; box-shadow:0 1px 3px rgba(0,0,0,.08); min-width:110px; }
+  .card .num { font-size:24px; font-weight:600; }
+  .card .lbl { font-size:12px; color:#7f8c8d; }
+  .card.warn .num { color:var(--danger); }
+
+  .statbar-wrap { background:#fff; border-radius:8px; padding:12px 16px; box-shadow:0 1px 3px rgba(0,0,0,.08); margin-bottom:12px; }
+  .statbar { display:flex; height:14px; border-radius:7px; overflow:hidden; background:#e8eaed; }
+  .statbar .s-todo { background:#95a5a6; } .statbar .s-doing { background:var(--c1); } .statbar .s-done { background:var(--ok); }
+  .statbar-legend { display:flex; gap:16px; margin-top:6px; font-size:12px; color:#7f8c8d; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; }
+
+  .progress-row { display:flex; gap:12px; overflow-x:auto; padding-bottom:4px; }
+  .progress-card { background:#fff; border-radius:8px; padding:10px 14px; box-shadow:0 1px 3px rgba(0,0,0,.08); min-width:210px; font-size:13px; }
+  .progress-card .bar { height:8px; border-radius:4px; background:#e8eaed; margin-top:7px; overflow:hidden; }
+  .progress-card .bar i { display:block; height:100%; border-radius:4px; }
+  .progress-card .meta { color:#7f8c8d; font-size:12px; margin-top:4px; }
+
+  .toolbar { margin:4px 0 12px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  select, .searchbox, button.viewbtn { padding:6px 10px; border:1px solid #d0d4d8; border-radius:6px; background:#fff; font-size:13px; }
+  .searchbox { width:180px; }
+  button.viewbtn { cursor:pointer; }
+  button.viewbtn.active { background:var(--c1); color:#fff; border-color:var(--c1); }
+
+  .layout { display:flex; gap:16px; align-items:flex-start; }
+  .gantt-wrap { background:#fff; border-radius:8px; padding:10px; box-shadow:0 1px 3px rgba(0,0,0,.08); overflow-x:auto; flex:1; min-width:0; }
+  .side { width:380px; flex-shrink:0; }
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.08); font-size:13px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid #eef0f2; }
+  th { background:#fafbfc; font-weight:600; color:#7f8c8d; font-size:12px; }
+  tr.done td { color:#b0b6bc; text-decoration:line-through; }
+  tr { cursor:pointer; }
+  .pflag { display:inline-block; padding:1px 7px; border-radius:10px; font-size:11px; color:#fff; margin-right:6px; }
+  .badge { display:inline-block; padding:1px 8px; border-radius:10px; font-size:11px; }
+  .badge.todo { background:#eceff1; color:#78909c; }
+  .badge.doing { background:#e8f0fb; color:var(--c1); }
+  .badge.done { background:#e8f8f0; color:var(--ok); }
+  .due-cell { border-radius:6px; padding:2px 8px; display:inline-block; font-size:12px; }
+  .due-cell.overdue { background:var(--danger); color:#fff; }
+  .due-cell.soon { background:#fdf3d7; color:#9c7a10; }
+  .res-panel { background:#fff; border-radius:8px; padding:12px; box-shadow:0 1px 3px rgba(0,0,0,.08); margin-top:14px; font-size:13px; }
+  .res-panel h3 { font-size:14px; margin-bottom:8px; }
+  .res-item { padding:4px 0; border-bottom:1px dashed #eef0f2; }
+  .res-item a { color:var(--c1); }
+  .hist { margin-top:6px; color:#7f8c8d; font-size:12px; line-height:1.6; }
+  .empty { color:#95a5a6; padding:20px; text-align:center; background:#fff; border-radius:8px; }
+
+  .bar-color-0 { fill:#4a6fa5 !important; } .bar-color-1 { fill:#7a9e7e !important; }
+  .bar-color-2 { fill:#b08552 !important; } .bar-color-3 { fill:#8a6f9e !important; }
+  .bar-color-4 { fill:#a05a7e !important; } .bar-color-5 { fill:#5a8ea0 !important; }
+  .bar-overdue .bar { stroke:var(--danger); stroke-width:2px; }
+  .bar-soon .bar { stroke:var(--warn); stroke-width:2px; stroke-dasharray:4 2; }
+
+  /* 看板视图 */
+  #view-kanban { display:none; }
+  .kanban-cols { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; align-items:start; }
+  .kcol { background:#edeff2; border-radius:10px; padding:10px; min-height:300px; }
+  .kcol.dragover { outline:2px dashed var(--c1); outline-offset:-4px; }
+  .kcol h4 { font-size:13px; color:#5f6b76; padding:2px 4px 10px; display:flex; justify-content:space-between; }
+  .kcard { background:#fff; border-radius:8px; padding:10px 12px; margin-bottom:8px; cursor:grab; box-shadow:0 1px 2px rgba(0,0,0,.12); border-left:4px solid transparent; }
+  .kcard:active { cursor:grabbing; }
+  .kcard .kt { font-size:13px; line-height:1.45; }
+  .kcard .km { display:flex; justify-content:space-between; align-items:center; margin-top:8px; }
+  .kcard .kp { font-size:11px; color:#7f8c8d; }
+  .kcard .kd { font-size:11px; border-radius:8px; padding:1px 8px; }
+  .kcard .kd.overdue { background:var(--danger); color:#fff; }
+  .kcard .kd.soon { background:#fdf3d7; color:#9c7a10; }
+  .kcard .kd.norm { background:#eceff1; color:#78909c; }
+
+  /* 任务详情侧栏 */
+  #detail { position:fixed; top:0; right:-420px; width:400px; height:100vh; background:#fff; box-shadow:-4px 0 24px rgba(0,0,0,.15); z-index:50; transition:right .25s; padding:20px; overflow-y:auto; }
+  #detail.open { right:0; }
+  #detail h2 { font-size:16px; margin:6px 0 4px; line-height:1.4; }
+  #detail .close { position:absolute; top:14px; right:16px; border:0; background:none; font-size:20px; cursor:pointer; color:#95a5a6; }
+  #detail .drow { font-size:13px; margin:8px 0; color:#5f6b76; }
+  #detail .desc { background:#f7f8fa; border-radius:8px; padding:10px; font-size:13px; margin:12px 0; white-space:pre-wrap; }
+  #detail .ops { display:flex; gap:8px; margin:14px 0; }
+  #detail .ops button { flex:1; padding:7px 0; border-radius:6px; border:1px solid #d0d4d8; background:#fff; cursor:pointer; font-size:13px; }
+  #detail .ops button.cur { background:var(--c1); color:#fff; border-color:var(--c1); }
+  #detail .ops button.donebtn.cur { background:var(--ok); border-color:var(--ok); }
+  #detail h5 { font-size:12px; color:#7f8c8d; margin:16px 0 6px; }
+  #detail .timeline-item { font-size:12px; color:#5f6b76; padding:3px 0; border-bottom:1px dashed #eef0f2; line-height:1.5; }
 </style>
 </head>
 <body>
-<h1>📋 mypm 项目看板</h1>
+<h1>📋 mypm 项目看板
+  <span class="tabs">
+    <button id="tab-overview" class="active">总览</button>
+    <button id="tab-kanban">看板</button>
+  </span>
+</h1>
+
 <div class="cards">
   <div class="card"><div class="num" id="n-projects">-</div><div class="lbl">进行中项目</div></div>
   <div class="card"><div class="num" id="n-soon">-</div><div class="lbl">7 天内到期</div></div>
   <div class="card warn"><div class="num" id="n-overdue">-</div><div class="lbl">已逾期</div></div>
 </div>
+
+<div class="statbar-wrap">
+  <div class="statbar" id="statbar"></div>
+  <div class="statbar-legend" id="statbar-legend"></div>
+</div>
+
+<div class="progress-row" id="progress-row"></div>
+
 <div class="toolbar">
   <select id="proj-filter"></select>
+  <select id="status-filter">
+    <option value="all">全部状态</option><option value="todo">待办</option>
+    <option value="doing">进行中</option><option value="done">已完成</option>
+  </select>
+  <input class="searchbox" id="search" placeholder="搜索任务/项目…">
+  <select id="sort">
+    <option value="due-asc">截止日 ↑</option><option value="due-desc">截止日 ↓</option><option value="created-desc">创建日 ↓</option>
+  </select>
   <button class="viewbtn" data-mode="Day">日</button>
   <button class="viewbtn active" data-mode="Week">周</button>
   <button class="viewbtn" data-mode="Month">月</button>
+  <button class="viewbtn" data-mode="Year">年</button>
 </div>
-<div class="layout">
-  <div class="gantt-wrap"><div id="gantt"></div></div>
-  <div class="side">
-    <table id="task-table"><thead><tr><th></th><th>任务</th><th>截止</th></tr></thead><tbody></tbody></table>
-    <div class="res-panel" id="res-panel" style="display:none"><h3 id="res-title"></h3><div id="res-body"></div></div>
+
+<!-- 总览视图 -->
+<div id="view-overview">
+  <div class="layout">
+    <div class="gantt-wrap"><div id="gantt"></div></div>
+    <div class="side">
+      <table id="task-table"><thead><tr><th></th><th>任务</th><th>状态</th><th>截止</th></tr></thead><tbody></tbody></table>
+      <div class="res-panel" id="res-panel" style="display:none"><h3 id="res-title"></h3><div id="res-body"></div></div>
+    </div>
   </div>
 </div>
 
+<!-- 看板视图 -->
+<div id="view-kanban">
+  <div class="kanban-cols">
+    <div class="kcol" data-status="todo"><h4>📥 待办 <span class="cnt"></span></h4><div class="kbody"></div></div>
+    <div class="kcol" data-status="doing"><h4>🔨 进行中 <span class="cnt"></span></h4><div class="kbody"></div></div>
+    <div class="kcol" data-status="done"><h4>✅ 已完成 <span class="cnt"></span></h4><div class="kbody"></div></div>
+  </div>
+</div>
+
+<!-- 任务详情侧栏 -->
+<div id="detail"><button class="close" onclick="closeDetail()">×</button><div id="detail-body"></div></div>
+
 <script>
-let DATA = null, gantt = null, curView = "Week";
+let DATA=null, gantt=null, curView="Week", curTab="overview", curTaskId=null;
+const COLORS=["#4a6fa5","#7a9e7e","#b08552","#8a6f9e","#a05a7e","#5a8ea0"];
+const STATUS_TXT={todo:"待办",doing:"进行中",done:"已完成"};
 
-const COLORS = ["#4a6fa5","#7a9e7e","#b08552","#8a6f9e","#a05a7e","#5a8ea0"];
-function localDate(d) { return new Intl.DateTimeFormat("en-CA",{year:"numeric",month:"2-digit",day:"2-digit"}).format(d); }
-function addDays(dstr, n) { const x = new Date(dstr + "T12:00:00"); x.setDate(x.getDate()+n); return localDate(x); }
+function localDate(d){return new Intl.DateTimeFormat("en-CA",{year:"numeric",month:"2-digit",day:"2-digit"}).format(d);}
+function addDays(dstr,n){const x=new Date(dstr+"T12:00:00");x.setDate(x.getDate()+n);return localDate(x);}
+function statusOf(t){return t.done?"done":(t.status||"todo");}
+function projColor(id){return COLORS[id%6];}
+function findProj(id){return DATA.projects.find(p=>p.id===id);}
+function dueInfo(t){
+  if(!t.due_date) return {cls:"",txt:""};
+  const today=localDate(new Date()), left=Math.round((Date.parse(t.due_date)-Date.parse(today))/864e5);
+  const overdue=left<0&&!t.done, soon=left>=0&&left<=3&&!t.done;
+  return {cls:overdue?"overdue":soon?"soon":"", txt:t.due_date+(overdue?" 逾期":left===0?" 今天":left>0&&left<=7?` ${left}天`:""), overdue, soon};
+}
 
-async function load() {
-  DATA = await (await fetch("/api/dashboard")).json();
-  document.getElementById("n-projects").textContent = DATA.summary.projects;
-  document.getElementById("n-soon").textContent = DATA.summary.dueSoon;
-  document.getElementById("n-overdue").textContent = DATA.summary.overdue;
-  const sel = document.getElementById("proj-filter");
-  sel.innerHTML = '<option value="all">全部项目</option>' + DATA.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
-  sel.onchange = () => { render(); showRes(sel.value); };
-  document.querySelectorAll(".viewbtn").forEach(b => b.onclick = () => {
+async function load(){
+  DATA=await (await fetch("/api/dashboard")).json();
+  document.getElementById("n-projects").textContent=DATA.summary.projects;
+  document.getElementById("n-soon").textContent=DATA.summary.dueSoon;
+  document.getElementById("n-overdue").textContent=DATA.summary.overdue;
+  const sel=document.getElementById("proj-filter");
+  sel.innerHTML='<option value="all">全部项目</option>'+DATA.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+  sel.onchange=()=>{render();};
+  document.getElementById("status-filter").onchange=render;
+  document.getElementById("search").oninput=render;
+  document.getElementById("sort").onchange=render;
+  document.querySelectorAll(".viewbtn").forEach(b=>b.onclick=()=>{
     document.querySelectorAll(".viewbtn").forEach(x=>x.classList.remove("active"));
-    b.classList.add("active"); curView = b.dataset.mode;
-    if (gantt) gantt.change_view_mode(curView);
+    b.classList.add("active");curView=b.dataset.mode;
+    if(gantt)gantt.change_view_mode(curView);
   });
-  render(); showRes("all");
+  document.getElementById("tab-overview").onclick=()=>switchTab("overview");
+  document.getElementById("tab-kanban").onclick=()=>switchTab("kanban");
+  renderStats();render();showRes(document.getElementById("proj-filter").value);
+  if(curTaskId)fillDetail(curTaskId);
 }
 
-function visibleProjects() {
-  const v = document.getElementById("proj-filter").value;
-  return v === "all" ? DATA.projects : DATA.projects.filter(p => p.id === +v);
+function switchTab(t){
+  curTab=t;
+  document.getElementById("tab-overview").classList.toggle("active",t==="overview");
+  document.getElementById("tab-kanban").classList.toggle("active",t==="kanban");
+  document.getElementById("view-overview").style.display=t==="overview"?"":"none";
+  document.getElementById("view-kanban").style.display=t==="kanban"?"":"none";
 }
 
-function render() {
-  const today = localDate(new Date());
-  const projs = visibleProjects();
-  // 甘特任务
-  const gtasks = [];
-  projs.forEach((p, pi) => {
-    p.tasks.filter(t=>!t.done).forEach(t => {
-      const due = t.due_date || addDays(t.created_at, 7);
-      gtasks.push({
-        id: String(t.id), name: (t.is_milestone?"◆ ":"") + t.title,
-        start: t.created_at <= due ? t.created_at : due,
-        end: due === t.created_at ? addDays(due,1) : due,
-        progress: 0, custom_class: "bar-color-" + (pi % 6)
-      });
-    });
+function visibleProjects(){
+  const v=document.getElementById("proj-filter").value;
+  return v==="all"?DATA.projects:DATA.projects.filter(p=>p.id===+v);
+}
+function filteredTasks(projs){
+  const st=document.getElementById("status-filter").value;
+  const q=document.getElementById("search").value.trim().toLowerCase();
+  const sort=document.getElementById("sort").value;
+  let ts=[];projs.forEach(p=>ts.push(...p.tasks));
+  if(st!=="all")ts=ts.filter(t=>statusOf(t)===st);
+  if(q)ts=ts.filter(t=>t.title.toLowerCase().includes(q)||(t.project_name||"").toLowerCase().includes(q));
+  ts.sort((a,b)=>{
+    if(sort==="created-desc")return b.id-a.id;
+    const ad=a.due_date||"9999",bd=b.due_date||"9999";
+    return sort==="due-desc"?bd.localeCompare(ad):ad.localeCompare(bd);
   });
-  const gEl = document.getElementById("gantt");
-  gEl.innerHTML = "";
-  if (!gtasks.length) { gEl.innerHTML = '<div class="empty">暂无任务</div>'; gantt = null; }
-  else {
-    gantt = new Gantt("#gantt", gtasks, {
-      view_mode: curView, language: "zh",
-      popup: false, column_width: 30, bar_height: 22, bar_corner_radius: 3, padding: 14
+  return ts;
+}
+
+function renderStats(){
+  const all=[];DATA.projects.forEach(p=>all.push(...p.tasks));
+  const n={todo:0,doing:0,done:0};all.forEach(t=>n[statusOf(t)]++);
+  const total=all.length||1;
+  document.getElementById("statbar").innerHTML=
+    `<div class="s-todo" style="width:${n.todo/total*100}%"></div>`+
+    `<div class="s-doing" style="width:${n.doing/total*100}%"></div>`+
+    `<div class="s-done" style="width:${n.done/total*100}%"></div>`;
+  document.getElementById("statbar-legend").innerHTML=
+    `<span><i class="dot" style="background:#95a5a6"></i>待办 ${n.todo}</span>`+
+    `<span><i class="dot" style="background:var(--c1)"></i>进行中 ${n.doing}</span>`+
+    `<span><i class="dot" style="background:var(--ok)"></i>已完成 ${n.done}</span>`;
+  document.getElementById("progress-row").innerHTML=DATA.projects.map(p=>{
+    const t=p.tasks.length, d=p.tasks.filter(x=>x.done).length, pct=t?Math.round(d/t*100):0;
+    return `<div class="progress-card">
+      <div><span class="dot" style="background:${projColor(p.id)}"></span><b>${p.name}</b></div>
+      <div class="bar"><i style="width:${pct}%;background:${projColor(p.id)}"></i></div>
+      <div class="meta">${d}/${t} 完成 · ${pct}%</div></div>`;
+  }).join("");
+}
+
+function render(){
+  const projs=visibleProjects();
+  const ts=filteredTasks(projs);
+  renderGantt(ts,projs);
+  renderTable(ts);
+  renderKanban(ts);
+}
+
+function renderGantt(ts,projs){
+  const pi={};projs.forEach((p,i)=>pi[p.id]=i%6);
+  const gtasks=ts.filter(t=>!t.done).map(t=>{
+    const due=t.due_date||addDays(t.created_at,7);
+    const di=dueInfo(t);
+    return {id:String(t.id),name:(t.is_milestone?"◆ ":"")+t.title,
+      start:t.created_at<=due?t.created_at:due, end:due===t.created_at?addDays(due,1):due,
+      progress:0, custom_class:`bar-color-${pi[t.project_id]??0}`+(di.overdue?" bar-overdue":di.soon?" bar-soon":"")};
+  });
+  const gEl=document.getElementById("gantt");
+  gEl.innerHTML="";
+  if(!gtasks.length){gEl.innerHTML='<div class="empty">暂无任务</div>';gantt=null;}
+  else{
+    gantt=new Gantt("#gantt",gtasks,{view_mode:curView,language:"zh",popup:false,column_width:30,bar_height:22,bar_corner_radius:3,padding:14});
+    document.querySelectorAll("#gantt .bar-wrapper").forEach(el=>{
+      el.style.cursor="pointer";
+      el.onclick=()=>{const id=+el.getAttribute("data-id");if(id)fillDetail(id);};
     });
   }
-  // 任务表
-  const tb = document.querySelector("#task-table tbody");
-  tb.innerHTML = "";
-  projs.forEach(p => p.tasks.forEach(t => {
-    const tr = document.createElement("tr");
-    if (t.done) tr.className = "done";
-    const overdue = !t.done && t.due_date && t.due_date < today;
-    if (overdue) tr.className = "overdue";
-    tr.innerHTML = `<td><input type="checkbox" ${t.done?"checked":""} data-id="${t.id}"></td>
-      <td><span class="pflag" style="background:${COLORS[p.id % 6]}">${p.name}</span>${t.is_milestone?"◆ ":""}${t.title}</td>
-      <td class="due">${t.due_date || ""}</td>`;
-    tr.querySelector("input").onchange = async (e) => {
-      await fetch(`/api/tasks/${e.target.dataset.id}/toggle`, {method:"POST"});
+}
+
+function renderTable(ts){
+  const tb=document.querySelector("#task-table tbody");
+  tb.innerHTML="";
+  ts.forEach(t=>{
+    const tr=document.createElement("tr");
+    if(t.done)tr.className="done";
+    const di=dueInfo(t), p=findProj(t.project_id);
+    tr.innerHTML=`<td><input type="checkbox" ${t.done?"checked":""} data-id="${t.id}"></td>
+      <td><span class="pflag" style="background:${projColor(t.project_id)}">${p?p.name:""}</span>${t.is_milestone?"◆ ":""}${t.title}</td>
+      <td><span class="badge ${statusOf(t)}">${STATUS_TXT[statusOf(t)]}</span></td>
+      <td>${t.due_date?`<span class="due-cell ${di.cls}">${di.txt}</span>`:""}</td>`;
+    tr.onclick=e=>{if(e.target.tagName!=="INPUT")fillDetail(t.id);};
+    tr.querySelector("input").onchange=async e=>{
+      e.stopPropagation();
+      await fetch(`/api/tasks/${e.target.dataset.id}/toggle`,{method:"POST"});
       load();
     };
     tb.appendChild(tr);
-  }));
+  });
 }
 
-function showRes(v) {
-  const panel = document.getElementById("res-panel");
-  const p = v === "all" ? null : DATA.projects.find(x=>x.id===+v);
-  if (!p || (!p.resources.length && !p.history.length)) { panel.style.display = "none"; return; }
-  panel.style.display = "";
-  document.getElementById("res-title").textContent = `📁 ${p.name} · 资料与历史`;
-  let html = "";
-  p.resources.forEach(r => {
-    html += `<div class="res-item">${r.type==="wechat_group"?"💬 微信群":r.type==="link"?"🔗":"📄"} ${r.label?r.label+" ":""}${
-      r.type==="link" ? `<a href="${r.value}" target="_blank">${r.value}</a>` : r.value}</div>`;
+function renderKanban(ts){
+  document.querySelectorAll(".kcol").forEach(col=>{
+    const st=col.dataset.status;
+    const list=ts.filter(t=>statusOf(t)===st);
+    col.querySelector(".cnt").textContent=list.length;
+    const body=col.querySelector(".kbody");
+    body.innerHTML="";
+    list.forEach(t=>{
+      const p=findProj(t.project_id), di=dueInfo(t);
+      const card=document.createElement("div");
+      card.className="kcard";card.draggable=true;
+      card.style.borderLeftColor=projColor(t.project_id);
+      card.innerHTML=`<div class="kt">${t.is_milestone?"◆ ":""}${t.title}</div>
+        <div class="km"><span class="kp">${p?p.name:""}</span>
+        ${t.due_date?`<span class="kd ${di.overdue?"overdue":di.soon?"soon":"norm"}">${di.txt}</span>`:""}</div>`;
+      card.ondragstart=e=>e.dataTransfer.setData("text/plain",String(t.id));
+      card.onclick=()=>fillDetail(t.id);
+      body.appendChild(card);
+    });
+    col.ondragover=e=>{e.preventDefault();col.classList.add("dragover");};
+    col.ondragleave=()=>col.classList.remove("dragover");
+    col.ondrop=async e=>{
+      e.preventDefault();col.classList.remove("dragover");
+      const id=e.dataTransfer.getData("text/plain");
+      if(statusOf({done:false,status:st})===st&&findTask(id)&&statusOf(findTask(id))===st)return;
+      await fetch(`/api/tasks/${id}/status`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:st})});
+      load();
+    };
   });
-  if (p.history.length) html += `<div class="hist">${p.history.map(h=>`· ${h.date} ${h.summary}`).join("<br>")}</div>`;
-  document.getElementById("res-body").innerHTML = html;
+}
+function findTask(id){id=+id;for(const p of DATA.projects){const t=p.tasks.find(x=>x.id===id);if(t)return t;}return null;}
+
+function fillDetail(id){
+  const t=findTask(id);if(!t)return;
+  curTaskId=id;
+  const p=findProj(t.project_id),di=dueInfo(t),st=statusOf(t);
+  let html=`<h2>${t.is_milestone?"◆ ":""}${t.title}</h2>
+    <div class="drow"><span class="pflag" style="background:${projColor(t.project_id)}">${p?p.name:""}</span> 创建于 ${t.created_at}</div>
+    <div class="drow">截止：<b>${t.due_date||"无"}</b>${di.overdue?" <span style='color:var(--danger)'>已逾期</span>":di.txt&&di.txt!==t.due_date?` （${di.txt}）`:""}</div>
+    <div class="ops">
+      <button data-st="todo" class="${st==="todo"?"cur":""}">待办</button>
+      <button data-st="doing" class="${st==="doing"?"cur":""}">进行中</button>
+      <button data-st="done" class="donebtn ${st==="done"?"cur":""}">已完成</button>
+    </div>`;
+  if(t.description)html+=`<h5>描述</h5><div class="desc">${t.description}</div>`;
+  if(p){
+    if(p.resources.length){
+      html+="<h5>项目资料</h5>"+p.resources.map(r=>
+        `<div class="res-item">${r.type==="wechat_group"?"💬 群":r.type==="link"?"🔗":"📄"} ${r.label?r.label+" ":""}${r.type==="link"?`<a href="${r.value}" target="_blank">${r.value}</a>`:r.value}</div>`).join("");
+    }
+    if(p.history.length){
+      html+="<h5>会议/进展历史</h5>"+p.history.map(h=>`<div class="timeline-item"><b>${h.date}</b> ${h.summary}</div>`).join("");
+    }
+  }
+  const body=document.getElementById("detail-body");
+  body.innerHTML=html;
+  body.querySelectorAll(".ops button").forEach(b=>b.onclick=async()=>{
+    await fetch(`/api/tasks/${id}/status`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:b.dataset.st})});
+    load();
+  });
+  document.getElementById("detail").classList.add("open");
+}
+function closeDetail(){document.getElementById("detail").classList.remove("open");curTaskId=null;}
+
+function showRes(v){
+  const panel=document.getElementById("res-panel");
+  const p=v==="all"?null:DATA.projects.find(x=>x.id===+v);
+  if(!p||(!p.resources.length&&!p.history.length)){panel.style.display="none";return;}
+  panel.style.display="";
+  document.getElementById("res-title").textContent=`📁 ${p.name} · 资料与历史`;
+  let html="";
+  p.resources.forEach(r=>{
+    html+=`<div class="res-item">${r.type==="wechat_group"?"💬 微信群":r.type==="link"?"🔗":"📄"} ${r.label?r.label+" ":""}${r.type==="link"?`<a href="${r.value}" target="_blank">${r.value}</a>`:r.value}</div>`;
+  });
+  if(p.history.length)html+=`<div class="hist">${p.history.map(h=>`· ${h.date} ${h.summary}`).join("<br>")}</div>`;
+  document.getElementById("res-body").innerHTML=html;
 }
 
 load();
-setInterval(load, 60000);
+setInterval(load,60000);
 </script>
 </body>
 </html>
