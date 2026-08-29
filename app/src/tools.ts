@@ -10,7 +10,7 @@ function ok(text: string) {
 
 function fmtTask(t: db.Task): string {
 	const statusLabel = t.done || t.status === "done" ? "已完成" : t.status === "doing" ? "进行中" : "待办";
-	const flags = [t.is_milestone ? "◆里程碑" : ""].filter(Boolean).join(" ");
+	const flags = [t.is_milestone ? "◆里程碑" : "", t.priority && t.priority !== "P3" ? t.priority : ""].filter(Boolean).join(" ");
 	const overdue = !t.done && t.due_date && t.due_date < localDate() ? "【逾期】" : "";
 	return `[id=${t.id}] ${t.project_name} ｜ ${t.title}${t.due_date ? ` ｜ 截止 ${t.due_date}` : ""} ｜ ${statusLabel}${flags ? ` ｜ ${flags}` : ""} ${overdue}`.trim();
 }
@@ -26,6 +26,28 @@ function fmtProject(p: db.Project, withTasks = true): string {
 }
 
 export const pmTools: AgentTool<any, any>[] = [
+	{
+		name: "update_project",
+		label: "修改项目",
+		description: "修改项目信息：目标(description)、状态(status: active推进中/done已完成/paused搁置)、项目截止日(end_date)、名称。",
+		parameters: Type.Object({
+			project: Type.String({ description: "项目名（支持模糊匹配）" }),
+			description: Type.Optional(Type.String({ description: "项目目标" })),
+			status: Type.Optional(Type.String({ description: "active/done/paused" })),
+			end_date: Type.Optional(Type.String({ description: "项目截止日 YYYY-MM-DD，传空串清除" })),
+		}),
+		executionMode: "sequential",
+		async execute(_id, params: any) {
+			const proj = db.findProject(params.project);
+			if (!proj) throw new Error(`找不到项目「${params.project}」`);
+			const p = db.updateProject(proj.id, {
+				description: params.description,
+				status: params.status,
+				end_date: params.end_date === undefined ? undefined : params.end_date || null,
+			});
+			return ok(`项目已更新：「${p!.name}」 目标:${p!.description || "无"} 状态:${p!.status}${p!.end_date ? ` 截止:${p!.end_date}` : ""}`);
+		},
+	},
 	{
 		name: "list_projects",
 		label: "列出项目",
@@ -94,8 +116,9 @@ export const pmTools: AgentTool<any, any>[] = [
 			const updateId = db.savePending(payload);
 			const lines: string[] = [`拟更新清单（更新编号 #${updateId}）：`];
 			payload.items.forEach((it, i) => {
+				const sched = it.start_date ? ` ｜ ${it.start_date}~${it.due_date ?? "?"}` : it.due_date ? ` ｜ 截止 ${it.due_date}` : "";
 				lines.push(
-					`  ${i + 1}. ${it.is_new ? "【新项目】" : ""}${it.project} ｜ ${it.is_milestone ? "◆" : ""}${it.title}${it.due_date ? ` ｜ 截止 ${it.due_date}` : ""}${it.description ? ` ｜ ${it.description}` : ""}`,
+					`  ${i + 1}. ${it.is_new ? "【新项目】" : ""}${it.project} ｜ ${it.is_milestone ? "◆" : ""}${it.title}${sched}${it.priority && it.priority !== "P3" ? ` ｜ ${it.priority}` : ""}${it.description ? ` ｜ ${it.description}` : ""}`,
 				);
 			});
 			for (const r of payload.resources)
@@ -136,9 +159,11 @@ export const pmTools: AgentTool<any, any>[] = [
 		parameters: Type.Object({
 			project: Type.String({ description: "项目名（支持模糊匹配，不存在会新建）" }),
 			title: Type.String({ description: "任务标题" }),
+			start_date: Type.Optional(Type.String({ description: "开始日 YYYY-MM-DD（有明确排期时填）" })),
 			due_date: Type.Optional(Type.String({ description: "截止日 YYYY-MM-DD" })),
 			description: Type.Optional(Type.String({ description: "补充说明" })),
 			is_milestone: Type.Optional(Type.Boolean({ description: "是否里程碑，默认否" })),
+			priority: Type.Optional(Type.String({ description: "优先级 P0最高~P3最低，默认P3" })),
 		}),
 		executionMode: "sequential",
 		async execute(_id, params: any) {
@@ -147,11 +172,15 @@ export const pmTools: AgentTool<any, any>[] = [
 			const t = db.createTask({
 				project_id: proj.id,
 				title: params.title,
+				start_date: params.start_date ?? null,
 				due_date: params.due_date ?? null,
 				description: params.description,
 				is_milestone: params.is_milestone,
+				priority: params.priority,
 			});
-			return ok(`已添加：${proj.name} ｜ ${t.title}${t.due_date ? ` ｜ 截止 ${t.due_date}` : ""} [id=${t.id}]`);
+			return ok(
+				`已添加：${proj.name} ｜ ${t.title}${t.start_date ? ` ｜ ${t.start_date}~${t.due_date ?? "?"}` : t.due_date ? ` ｜ 截止 ${t.due_date}` : ""}${t.priority !== "P3" ? ` ｜ ${t.priority}` : ""} [id=${t.id}]`,
+			);
 		},
 	},
 	{
@@ -161,18 +190,22 @@ export const pmTools: AgentTool<any, any>[] = [
 			"改截止日/标记完成/改名/改状态时调用。需要任务id（可先用 list_tasks 查）。done 传 true 表示完成；status 取 todo(待办)/doing(进行中)/done(已完成)。",
 		parameters: Type.Object({
 			task_id: Type.Number({ description: "任务id" }),
+			start_date: Type.Optional(Type.String({ description: "新开始日 YYYY-MM-DD" })),
 			due_date: Type.Optional(Type.String({ description: "新截止日 YYYY-MM-DD" })),
 			done: Type.Optional(Type.Boolean({ description: "是否完成" })),
 			title: Type.Optional(Type.String({ description: "新标题" })),
 			status: Type.Optional(Type.String({ description: "任务状态：todo/doing/done" })),
+			priority: Type.Optional(Type.String({ description: "优先级 P0~P3" })),
 		}),
 		executionMode: "sequential",
 		async execute(_id, params: any) {
 			const t = db.updateTask(params.task_id, {
+				start_date: params.start_date === undefined ? undefined : (params.start_date as string | null),
 				due_date: params.due_date === undefined ? undefined : (params.due_date as string | null),
 				done: params.done,
 				title: params.title,
 				status: params.status,
+				priority: params.priority,
 			});
 			if (!t) throw new Error(`任务 ${params.task_id} 不存在`);
 			return ok(`已更新：${fmtTask(t)}`);

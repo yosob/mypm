@@ -135,6 +135,7 @@
   <button class="viewbtn" data-mode="Month">月</button>
   <button class="viewbtn" data-mode="Year">年</button>
   <button class="viewbtn addbtn" id="btn-add" style="background:var(--ok);color:#fff;border-color:var(--ok)">＋ 新建任务</button>
+  <button class="viewbtn" id="btn-add-proj" style="background:#fff;">＋ 新建项目</button>
 </div>
 
 <!-- 总览视图 -->
@@ -160,6 +161,20 @@
 <!-- 任务详情侧栏 -->
 <div id="detail"><button class="close" onclick="closeDetail()">×</button><div id="detail-body"></div></div>
 
+<!-- 项目弹窗 -->
+<div id="proj-mask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:60" onclick="closeProjModal()">
+  <div onclick="event.stopPropagation()" style="position:absolute;top:12%;left:50%;transform:translateX(-50%);width:400px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+    <h3 style="margin-bottom:14px" id="proj-modal-title">新建项目</h3>
+    <div class="mform">
+      <label>项目名 *</label><input id="p-name">
+      <label>目标</label><textarea id="p-desc" rows="2" placeholder="这个项目要达成什么？"></textarea>
+      <label>状态</label><select id="p-status"><option value="active">推进中</option><option value="paused">已搁置</option><option value="done">已完成</option></select>
+      <label>项目截止日</label><input id="p-end" type="date">
+      <div class="mops"><button onclick="closeProjModal()">取消</button><button class="primary" id="p-save">保存</button></div>
+    </div>
+  </div>
+</div>
+
 <!-- 新建任务弹窗 -->
 <div id="modal-mask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:60" onclick="closeModal()">
   <div id="modal" onclick="event.stopPropagation()" style="position:absolute;top:12%;left:50%;transform:translateX(-50%);width:400px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.25)">
@@ -167,8 +182,10 @@
     <div class="mform">
       <label>标题 *</label><input id="m-title" placeholder="要做什么？">
       <label>项目 *</label><select id="m-project"></select>
+      <label>开始日</label><input id="m-start" type="date">
       <label>截止日</label><input id="m-due" type="date">
       <label>状态</label><select id="m-status"><option value="todo">待办</option><option value="doing">进行中</option></select>
+      <label>优先级</label><select id="m-priority"><option value="P3">P3 普通</option><option value="P2">P2</option><option value="P1">P1</option><option value="P0">P0 紧急</option></select>
       <label>里程碑</label><label style="font-weight:400"><input id="m-milestone" type="checkbox"> 关键节点（◆）</label>
       <label>备注</label><textarea id="m-desc" rows="2"></textarea>
       <div class="mops"><button onclick="closeModal()">取消</button><button class="primary" id="m-save">保存</button></div>
@@ -223,6 +240,8 @@ async function load(){
   document.getElementById("tab-kanban").onclick=()=>switchTab("kanban");
   document.getElementById("btn-add").onclick=openModal;
   document.getElementById("m-save").onclick=saveTask;
+  document.getElementById("btn-add-proj").onclick=()=>openProjModal(null);
+  document.getElementById("p-save").onclick=saveProject;
   renderStats();render();showRes(document.getElementById("proj-filter").value);
   if(curTaskId&&!editing)fillDetail(curTaskId);
 }
@@ -268,10 +287,13 @@ function renderStats(){
     `<span><i class="dot" style="background:var(--ok)"></i>已完成 ${n.done}</span>`;
   document.getElementById("progress-row").innerHTML=DATA.projects.map(p=>{
     const t=p.tasks.length, d=p.tasks.filter(x=>x.done).length, pct=t?Math.round(d/t*100):0;
-    return `<div class="progress-card">
-      <div><span class="dot" style="background:${projColor(p.id)}"></span><b>${p.name}</b></div>
+    const stTxt={active:"推进中",done:"已完成",paused:"已搁置"}[p.status]||p.status;
+    const stCls=p.status==="done"?"done":p.status==="paused"?"todo":"doing";
+    return `<div class="progress-card" onclick="editProject(${p.id})" style="cursor:pointer">
+      <div><span class="dot" style="background:${projColor(p.id)}"></span><b>${p.name}</b> <span class="badge ${stCls}" style="margin-left:4px">${stTxt}</span></div>
+      ${p.description?`<div class="meta" style="margin-top:5px;white-space:normal">🎯 ${p.description}</div>`:""}
       <div class="bar"><i style="width:${pct}%;background:${projColor(p.id)}"></i></div>
-      <div class="meta">${d}/${t} 完成 · ${pct}%</div></div>`;
+      <div class="meta">${d}/${t} 完成 · ${pct}%${p.end_date?` · 项目截止 ${p.end_date}`:""}</div></div>`;
   }).join("");
 }
 
@@ -286,10 +308,11 @@ function render(){
 function renderGantt(ts,projs){
   const pi={};projs.forEach((p,i)=>pi[p.id]=i%6);
   const gtasks=ts.filter(t=>!t.done).map(t=>{
-    const due=t.due_date||addDays(t.created_at,7);
+    const due=t.due_date||addDays(t.start_date||t.created_at,7);
+    const start=t.start_date||t.created_at;
     const di=dueInfo(t);
     return {id:String(t.id),name:(t.is_milestone?"◆ ":"")+t.title,
-      start:t.created_at<=due?t.created_at:due, end:due===t.created_at?addDays(due,1):due,
+      start:start<=due?start:due, end:due===start?addDays(due,1):due,
       progress:0, custom_class:di.overdue?"bar-overdue":di.soon?"bar-soon":`bar-color-${pi[t.project_id]??0}`};
   });
   const gEl=document.getElementById("gantt");
@@ -363,13 +386,22 @@ function fillDetail(id){
   const p=findProj(t.project_id),di=dueInfo(t),st=statusOf(t);
   let html=`<h2>${t.is_milestone?"◆ ":""}${t.title}</h2>
     <div class="drow"><span class="pflag" style="background:${projColor(t.project_id)}">${p?p.name:""}</span> 创建于 ${t.created_at}</div>
-    <div class="drow">截止：<b>${t.due_date||"无"}</b>${di.overdue?" <span style='color:var(--danger)'>已逾期</span>":di.txt&&di.txt!==t.due_date?` （${di.txt}）`:""}</div>
+    <div class="drow">排期：<b>${t.start_date||"…"} ~ ${t.due_date||"…"}</b>${di.overdue?" <span style='color:var(--danger)'>已逾期</span>":di.txt&&di.txt!==t.due_date?` （${di.txt}）`:""}</div>
+    ${t.priority&&t.priority!=="P3"?`<div class="drow">优先级：<b>${t.priority}</b></div>`:""}
     <div class="ops">
       <button data-st="todo" class="${st==="todo"?"cur":""}">待办</button>
       <button data-st="doing" class="${st==="doing"?"cur":""}">进行中</button>
       <button data-st="done" class="donebtn ${st==="done"?"cur":""}">已完成</button>
     </div>`;
   if(t.description)html+=`<h5>描述</h5><div class="desc">${t.description}</div>`;
+  if(t.parent_id){
+    const pt=findTask(t.parent_id);
+    if(pt)html+=`<h5>父任务</h5><div class="timeline-item" style="cursor:pointer" onclick="fillDetail(${pt.id})">↖ [id=${pt.id}] ${pt.title}</div>`;
+  }
+  const subs=DATA.projects.flatMap(x=>x.tasks).filter(x=>x.parent_id===t.id);
+  if(subs.length){
+    html+="<h5>子任务</h5>"+subs.map(x=>`<div class="timeline-item" style="cursor:pointer" onclick="fillDetail(${x.id})">↳ [id=${x.id}] ${x.title}${x.done?" ✅":""}</div>`).join("");
+  }
   if(p){
     if(p.resources.length){
       html+="<h5>项目资料</h5>"+p.resources.map(r=>
@@ -395,7 +427,9 @@ function openModal(){
   const sel=document.getElementById("m-project");
   sel.innerHTML=DATA.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
   document.getElementById("m-title").value="";
+  document.getElementById("m-start").value="";
   document.getElementById("m-due").value="";
+  document.getElementById("m-priority").value="P3";
   document.getElementById("m-status").value="todo";
   document.getElementById("m-milestone").checked=false;
   document.getElementById("m-desc").value="";
@@ -407,6 +441,8 @@ async function saveTask(){
   const title=document.getElementById("m-title").value.trim();
   if(!title)return alert("请填标题");
   const body={title,project_id:+document.getElementById("m-project").value,
+    start_date:document.getElementById("m-start").value||null,
+    priority:document.getElementById("m-priority").value,
     due_date:document.getElementById("m-due").value||null,
     status:document.getElementById("m-status").value,
     is_milestone:document.getElementById("m-milestone").checked,
@@ -416,6 +452,35 @@ async function saveTask(){
   closeModal();load();
 }
 
+// ---------- 项目新建/编辑 ----------
+let editingProjId=null;
+function openProjModal(p){
+  editingProjId=p?p.id:null;
+  document.getElementById("proj-modal-title").textContent=p?"编辑项目":"新建项目";
+  document.getElementById("p-name").value=p?p.name:"";
+  document.getElementById("p-desc").value=p?(p.description||""):"";
+  document.getElementById("p-status").value=p?p.status:"active";
+  document.getElementById("p-end").value=p?(p.end_date||""):"";
+  document.getElementById("proj-mask").style.display="";
+  document.getElementById("p-name").focus();
+}
+function closeProjModal(){document.getElementById("proj-mask").style.display="none";}
+async function saveProject(){
+  const name=document.getElementById("p-name").value.trim();
+  if(!name)return alert("请填项目名");
+  const body={name,description:document.getElementById("p-desc").value.trim(),
+    status:document.getElementById("p-status").value,
+    end_date:document.getElementById("p-end").value||null};
+  const url=editingProjId?`/api/projects/${editingProjId}/update`:"/api/projects";
+  const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok){const e=await r.json().catch(()=>({}));return alert("保存失败："+(e.error||r.status));}
+  closeProjModal();load();
+}
+function editProject(id){
+  const p=DATA.projects.find(x=>x.id===id);
+  if(p)openProjModal(p);
+}
+
 // ---------- 编辑 / 删除 ----------
 function editDetail(id){
   const t=findTask(id);if(!t)return;
@@ -423,7 +488,9 @@ function editDetail(id){
   document.getElementById("detail-body").innerHTML=`
     <h2 style="margin-top:26px">编辑任务</h2>
     <div class="editrow"><label style="font-size:12px;color:#7f8c8d">标题</label><input id="e-title" value="${t.title.replace(/"/g,"&quot;")}"></div>
+    <div class="editrow"><label style="font-size:12px;color:#7f8c8d">开始日</label><input id="e-start" type="date" value="${t.start_date||""}"></div>
     <div class="editrow"><label style="font-size:12px;color:#7f8c8d">截止日</label><input id="e-due" type="date" value="${t.due_date||""}"></div>
+    <div class="editrow"><label style="font-size:12px;color:#7f8c8d">优先级</label><select id="e-priority">${["P3","P2","P1","P0"].map(x=>`<option value="${x}" ${t.priority===x?"selected":""}>${x}</option>`).join("")}</select></div>
     <div class="editrow"><label style="font-size:12px;color:#7f8c8d">备注</label><textarea id="e-desc" rows="3">${t.description||""}</textarea></div>
     <div class="ops">
       <button onclick="fillDetail(${id})">取消</button>
@@ -432,7 +499,9 @@ function editDetail(id){
 }
 async function saveEdit(id){
   const body={title:document.getElementById("e-title").value.trim()||undefined,
+    start_date:document.getElementById("e-start").value||null,
     due_date:document.getElementById("e-due").value||null,
+    priority:document.getElementById("e-priority").value,
     description:document.getElementById("e-desc").value};
   const r=await fetch(`/api/tasks/${id}/update`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
   if(!r.ok)return alert("保存失败");

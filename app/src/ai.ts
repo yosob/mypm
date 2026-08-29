@@ -31,7 +31,8 @@ const EXTRACT_PROMPT = `你是项目管理助手。从下面的会议纪要中�
 {{
   "items": [
     {{"project": "项目名", "is_new": false, "title": "待办/任务标题",
-      "due_date": "YYYY-MM-DD 或 null", "is_milestone": false, "description": "补充说明"}}
+      "start_date": "YYYY-MM-DD 或 null", "due_date": "YYYY-MM-DD 或 null",
+      "is_milestone": false, "priority": "P0~P3（紧急重要P0，默认P3）", "description": "补充说明"}}
   ],
   "resources": [
     {{"project": "项目名", "type": "wechat_group或link", "value": "群名或链接", "label": "简短说明"}}
@@ -45,6 +46,8 @@ const EXTRACT_PROMPT = `你是项目管理助手。从下面的会议纪要中�
 - 每个可执行待办一条 item
 - 关键时间节点（评审、交付、截止）is_milestone=true
 - 相对日期（下周三等）以今天为基准换算成 YYYY-MM-DD；只给月日的按未来最近日期补全年份
+- 任务有明确的时间区间（X日起到Y日、本周做X）时同时给 start_date 和 due_date；只有截止日则 start_date 为 null
+- 纪要中明显紧急/高优先的标 P0/P1，默认 P3
 - 微信群名、文档链接放入 resources，不混入任务 description
 - 没有对应内容就给空数组
 

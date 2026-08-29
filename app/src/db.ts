@@ -66,12 +66,23 @@ CREATE TABLE IF NOT EXISTS settings(
 );
 `;
 
+/** 旧库平滑迁移：新增列（参照飞书模板：任务开始时间、项目截止时间） */
+function migrate(db: Database.Database) {
+	const addCol = (table: string, col: string, ddl: string) => {
+		const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+		if (!cols.some((c) => c.name === col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+	};
+	addCol("tasks", "start_date", "start_date TEXT");
+	addCol("projects", "end_date", "end_date TEXT");
+}
+
 export type Project = {
 	id: number;
 	name: string;
 	description: string;
-	status: string;
+	status: string; // active | done | paused | archived
 	created_at: string;
+	end_date: string | null;
 };
 export type Task = {
 	id: number;
@@ -81,6 +92,7 @@ export type Task = {
 	title: string;
 	description: string;
 	due_date: string | null;
+	start_date: string | null;
 	is_milestone: number;
 	done: number;
 	done_at: string | null;
@@ -97,8 +109,10 @@ export type ExtractedUpdate = {
 		project: string;
 		is_new: boolean;
 		title: string;
+		start_date: string | null;
 		due_date: string | null;
 		is_milestone: boolean;
+		priority: string;
 		description: string;
 	}[];
 	resources: { project: string; type: string; value: string; label: string }[];
@@ -134,6 +148,7 @@ function openDb(): Database.Database {
 	db.pragma("journal_mode = WAL");
 	db.pragma("foreign_keys = ON");
 	db.exec(SCHEMA);
+	migrate(db);
 	return db;
 }
 
@@ -160,21 +175,34 @@ export const db = openDb();
 // ---------- projects ----------
 
 export function listProjects(): Project[] {
-	return db.prepare("SELECT * FROM projects WHERE status='active' ORDER BY name").all() as Project[];
+	return db.prepare("SELECT * FROM projects WHERE status != 'archived' ORDER BY name").all() as Project[];
 }
 
 export function findProject(nameLike: string): Project | undefined {
 	return (
-		db.prepare("SELECT * FROM projects WHERE status='active' AND name = ?").get(nameLike) as Project | undefined ??
-		(db.prepare("SELECT * FROM projects WHERE status='active' AND name LIKE ? ORDER BY LENGTH(name) LIMIT 1").get(`%${nameLike}%`) as
+		db.prepare("SELECT * FROM projects WHERE status != 'archived' AND name = ?").get(nameLike) as Project | undefined ??
+		(db.prepare("SELECT * FROM projects WHERE status != 'archived' AND name LIKE ? ORDER BY LENGTH(name) LIMIT 1").get(`%${nameLike}%`) as
 			| Project
 			| undefined)
 	);
 }
 
-export function createProject(name: string, description = ""): Project {
-	const info = db.prepare("INSERT INTO projects(name, description, created_at) VALUES(?,?,?)").run(name, description, today());
+export function createProject(name: string, description = "", end_date: string | null = null): Project {
+	const info = db.prepare("INSERT INTO projects(name, description, end_date, created_at) VALUES(?,?,?,?)").run(name, description, end_date, today());
 	return db.prepare("SELECT * FROM projects WHERE id=?").get(info.lastInsertRowid) as Project;
+}
+
+export function updateProject(id: number, patch: { name?: string; description?: string; status?: string; end_date?: string | null }): Project | undefined {
+	const p = db.prepare("SELECT * FROM projects WHERE id=?").get(id) as Project | undefined;
+	if (!p) return undefined;
+	db.prepare("UPDATE projects SET name=?, description=?, status=?, end_date=? WHERE id=?").run(
+		patch.name ?? p.name,
+		patch.description ?? p.description,
+		patch.status ?? p.status,
+		patch.end_date !== undefined ? patch.end_date : p.end_date,
+		id,
+	);
+	return db.prepare("SELECT * FROM projects WHERE id=?").get(id) as Project;
 }
 
 export function setDescription(projectId: number, description: string) {
@@ -186,7 +214,7 @@ export function setDescription(projectId: number, description: string) {
 export type TaskFilter = { projectId?: number; dueWithinDays?: number; includeDone?: boolean };
 
 export function listTasks(filter: TaskFilter = {}): Task[] {
-	const conds: string[] = ["p.status='active'"];
+	const conds: string[] = ["p.status != 'archived'"];
 	const args: unknown[] = [];
 	if (filter.projectId) {
 		conds.push("t.project_id = ?");
@@ -215,26 +243,41 @@ export function createTask(input: {
 	project_id: number;
 	title: string;
 	due_date?: string | null;
+	start_date?: string | null;
 	description?: string;
 	is_milestone?: boolean;
+	priority?: string;
+	parent_id?: number | null;
 }): Task {
 	const info = db
 		.prepare(
-			`INSERT INTO tasks(project_id, title, description, due_date, is_milestone, created_at)
-			 VALUES(?,?,?,?,?,?)`,
+			`INSERT INTO tasks(project_id, parent_id, title, description, due_date, start_date, is_milestone, priority, created_at)
+			 VALUES(?,?,?,?,?,?,?,?,?)`,
 		)
 		.run(
 			input.project_id,
+			input.parent_id ?? null,
 			input.title,
 			input.description ?? "",
 			input.due_date ?? null,
+			input.start_date ?? null,
 			input.is_milestone ? 1 : 0,
+			input.priority ?? "P3",
 			today(),
 		);
 	return getTask(info.lastInsertRowid as number)!;
 }
 
-export type UpdatePatch = { due_date?: string | null; done?: boolean; title?: string; description?: string; status?: string };
+export type UpdatePatch = {
+	due_date?: string | null;
+	start_date?: string | null;
+	done?: boolean;
+	title?: string;
+	description?: string;
+	status?: string;
+	priority?: string;
+	parent_id?: number | null;
+};
 
 export function updateTask(
 	id: number,
@@ -243,20 +286,17 @@ export function updateTask(
 	const t = getTask(id);
 	if (!t) return undefined;
 	const due = patch.due_date !== undefined ? patch.due_date : t.due_date;
+	const startDate = patch.start_date !== undefined ? patch.start_date : t.start_date;
 	const done = patch.done !== undefined ? (patch.done ? 1 : 0) : t.done;
 	const title = patch.title ?? t.title;
 	const desc = patch.description ?? t.description;
 	let status = patch.status ?? t.status;
 	if (patch.done !== undefined) status = patch.done ? "done" : status === "done" ? "todo" : status;
-	db.prepare("UPDATE tasks SET due_date=?, done=?, done_at=?, title=?, description=?, status=? WHERE id=?").run(
-		due,
-		done,
-		done ? today() : null,
-		title,
-		desc,
-		status,
-		id,
-	);
+	const priority = patch.priority ?? t.priority;
+	const parentId = patch.parent_id !== undefined ? patch.parent_id : t.parent_id;
+	db.prepare(
+		"UPDATE tasks SET due_date=?, start_date=?, done=?, done_at=?, title=?, description=?, status=?, priority=?, parent_id=? WHERE id=?",
+	).run(due, startDate, done, done ? today() : null, title, desc, status, priority, parentId, id);
 	return getTask(id);
 }
 
@@ -322,11 +362,15 @@ export function applyPending(id: number): { ok: boolean; text: string } {
 			const t = createTask({
 				project_id: proj.id,
 				title: it.title,
+				start_date: it.start_date ?? null,
 				due_date: it.due_date,
 				description: it.description,
 				is_milestone: it.is_milestone,
+				priority: it.priority,
 			});
-			lines.push(`${proj.name} → ${it.is_milestone ? "◆" : ""}${t.title}${t.due_date ? `（截止 ${t.due_date}）` : ""} [id=${t.id}]`);
+			lines.push(
+				`${proj.name} → ${it.is_milestone ? "◆" : ""}${t.title}${t.start_date ? `（${t.start_date}~${t.due_date ?? "?"}）` : t.due_date ? `（截止 ${t.due_date}）` : ""} [id=${t.id}]`,
+			);
 		}
 		for (const r of p.resources) {
 			const proj = findProject(r.project);
