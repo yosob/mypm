@@ -1,18 +1,67 @@
-import { createModels } from "@earendil-works/pi-ai";
+import { createModels, createProvider, envApiKeyAuth, type Provider } from "@earendil-works/pi-ai";
 import { zaiCodingCnProvider } from "@earendil-works/pi-ai/providers/zai-coding-cn";
-import { config } from "./config";
+import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
+import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
+import { config, type CustomProvider } from "./config";
 import { localDate } from "./paths";
 import type { ExtractedUpdate } from "./db";
 import { listProjects } from "./db";
 
 process.env.TZ = "Asia/Shanghai";
-process.env.ZAI_CODING_CN_API_KEY = config.glm.apiKey; // 内置智谱 provider 从该 env 取 key
 
-export const MODEL_ID = config.glm.model;
+/** 把 config.llm.custom 的自定义端点注册为 provider（密钥注入专属 env 后由 pi 的 auth 解析） */
+export function registerCustom(c: CustomProvider): Provider<"openai-completions" | "anthropic-messages"> {
+	const envName = `MYPM_${c.id.toUpperCase().replace(/-/g, "_")}_API_KEY`;
+	process.env[envName] = c.apiKey;
+	const models = c.models.map((m) => ({
+		id: m.id,
+		name: m.name ?? m.id,
+		api: c.api,
+		provider: c.id,
+		baseUrl: c.baseUrl,
+		reasoning: false,
+		input: ["text"] as ("text" | "image")[],
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+		contextWindow: m.contextWindow ?? 128000,
+		maxTokens: m.maxTokens ?? 8192,
+	}));
+	return createProvider({
+		id: c.id,
+		name: c.name ?? c.id,
+		baseUrl: c.baseUrl,
+		auth: { apiKey: envApiKeyAuth(`${c.id} key`, [envName]) },
+		models,
+		api: c.api === "anthropic-messages" ? anthropicMessagesApi() : openAICompletionsApi(),
+	});
+}
 
+/** 组装模型目录：内置智谱 + config 声明的自定义 provider + 其他内置按 env 自动识别 */
 export const models = createModels();
 models.setProvider(zaiCodingCnProvider());
-export const model = models.getModel("zai-coding-cn", MODEL_ID) as any;
+for (const c of config.llm.custom ?? []) {
+	try {
+		models.setProvider(registerCustom(c));
+	} catch (e) {
+		console.error(`[ai] 自定义 provider "${c.id}" 注册失败:`, e instanceof Error ? e.message : e);
+	}
+}
+if (config.llm.provider === "zai-coding-cn" && config.llm.apiKey) {
+	process.env.ZAI_CODING_CN_API_KEY = config.llm.apiKey;
+}
+
+export const MODEL_ID = config.llm.model;
+export const model = models.getModel(config.llm.provider, config.llm.model);
+if (!model) {
+	const avail = models
+		.getModels()
+		.map((m) => `${m.provider}/${m.id}`)
+		.slice(0, 40)
+		.join("\n  ");
+	console.error(`[ai] 找不到模型 ${config.llm.provider}/${config.llm.model}（config.json llm 节）。可用模型（前40）：\n  ${avail}`);
+	process.exit(1);
+}
+
+
 /** Agent 构造所需的 streamFn（绑定模型目录，自动解析 api/key） */
 export const streamFn = (models as any).streamSimple.bind(models);
 

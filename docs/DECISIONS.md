@@ -68,3 +68,12 @@
 - 采用 pi 精华：密钥字段值支持 `$VAR`/`${VAR}` 环境变量引用（`$$` 转义；未定义→空+警告）
 - config.json gitignore + config.example.json 模板提交；缺字段用内置默认；dotenv 依赖移除
 - 附带收益：cron 时刻/提醒窗口/会话参数全部可配；ESM import 早于 env 加载的时序坑根除
+
+## 决议 #30（2026-08-30）：LLM 多 provider 化
+
+- config.json llm 节：provider+model 指定当前用哪家；custom[] 声明任意数量自定义端点
+  （api: openai-completions | anthropic-messages，各自 apiKey 支持 $ENV 引用）
+- 实现：ai.ts registerCustom() 用 pi 的 createProvider 注册；内置 zai 始终可用；
+  getModel 失败时列出可用模型清单后退出
+- 旧 glm{apiKey,model} 节自动迁移为 llm 节（向后兼容）
+- 切换模型 = 改 config.json 两行 + 重启，不动代码

@@ -9,15 +9,30 @@ import { ROOT, log } from "./paths";
  * - 缺字段用内置默认值；config.json 不存在则报错退出
  */
 
+/** 自定义模型端点（OpenAI 兼容 / Anthropic 兼容） */
+export type CustomProvider = {
+	id: string;
+	name?: string;
+	baseUrl: string;
+	api: "openai-completions" | "anthropic-messages";
+	apiKey: string;
+	models: { id: string; name?: string; contextWindow?: number; maxTokens?: number }[];
+};
+
 export type AppConfig = {
-	glm: { apiKey: string; model: string };
+	llm: {
+		provider: string; // 内置 provider id（如 zai-coding-cn/anthropic/openai）或 custom[].id
+		model: string;
+		apiKey?: string; // 内置 provider 的 key（如智谱）；custom 的 key 在各自节点
+		custom?: CustomProvider[];
+	};
 	lark: { appId: string; appSecret: string; domain: "lark" | "feishu" };
 	notify: { webhook: string };
 	app: { port: number; remindDays: number; remindCron: string; sessionMax: number; sessionKeep: number };
 };
 
 const DEFAULTS: AppConfig = {
-	glm: { apiKey: "", model: "glm-4.7" },
+	llm: { provider: "zai-coding-cn", model: "glm-4.7", apiKey: "", custom: [] },
 	lark: { appId: "", appSecret: "", domain: "lark" },
 	notify: { webhook: "" },
 	app: { port: 8787, remindDays: 7, remindCron: "0 9 * * *", sessionMax: 200, sessionKeep: 50 },
@@ -67,8 +82,13 @@ if (!fs.existsSync(FILE)) {
 	process.exit(1);
 }
 const raw = JSON.parse(fs.readFileSync(FILE, "utf8"));
-export const config: AppConfig = deepMerge(DEFAULTS, deepResolve(raw, "config"));
+const resolved = deepResolve(raw, "config");
+// 向后兼容：旧 glm{apiKey,model} 节 → llm{provider:zai-coding-cn,...}
+if (resolved.glm && !resolved.llm) {
+	resolved.llm = { provider: "zai-coding-cn", model: resolved.glm.model, apiKey: resolved.glm.apiKey };
+}
+export const config: AppConfig = deepMerge(DEFAULTS, resolved);
 
 /** 关键密钥自检（缺失不阻断，由使用方给出明确错误） */
-if (!config.glm.apiKey) log("config 警告: glm.apiKey 为空（AI 将不可用）");
+if (config.llm.provider === "zai-coding-cn" && !config.llm.apiKey) log("config 警告: llm.apiKey 为空（AI 将不可用）");
 if (!config.lark.appId || !config.lark.appSecret) log("config 警告: lark 凭证为空（Lark 桥将不启动）");
