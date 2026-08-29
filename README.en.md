@@ -72,6 +72,7 @@ Stack: TypeScript · [pi agent](https://github.com/earendil-works/pi) · Lark We
 | How it's built | docs/IMPLEMENTATION.md · app/ARCHITECTURE.md |
 | How AI connects to data (tools/loop/confirm flow) | docs/AI-NATIVE.md |
 | Deploy / machine migration (Win→Mac/Linux) | docs/DEPLOY.md |
+| Lark/Feishu app setup tutorial (Chinese) | docs/LARK.md |
 | Design decisions & pitfalls | docs/DECISIONS.md · docs/DETAILS.md |
 
 ## Scope & roadmap

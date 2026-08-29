@@ -50,7 +50,7 @@
 ## 快速开始
 
 ```bash
-# 0) 准备：Node ≥22、一个 Lark 自建应用（机器人+长连接）、GLM API Key
+# 0) 准备：Node ≥22、GLM API Key、Lark 自建应用（创建步骤见 docs/LARK.md）
 # 1) 配置：复制 config.example.json 为 config.json，填入密钥（见下方"配置说明"）
 cd app && npm install
 npm run dev        # 启动；或 Windows 双击项目根 start-mypm.bat
@@ -129,6 +129,7 @@ npm run dev        # 启动；或 Windows 双击项目根 start-mypm.bat
 | 系统怎么搭的 | docs/IMPLEMENTATION.md · app/ARCHITECTURE.md |
 | AI 如何连接数据（工具/循环/确认流） | docs/AI-NATIVE.md |
 | 部署/换机（Win→Mac/Linux） | docs/DEPLOY.md |
+| Lark/飞书 应用创建与配置教程 | docs/LARK.md |
 | 所有设计决议与踩坑 | docs/DECISIONS.md · docs/DETAILS.md |
 
 ## 边界与二期
