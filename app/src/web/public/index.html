@@ -57,7 +57,9 @@
   .due-cell.soon { background:#fdf3d7; color:#9c7a10; }
   .res-panel { background:#fff; border-radius:8px; padding:12px; box-shadow:0 1px 3px rgba(0,0,0,.08); margin-top:14px; font-size:13px; }
   .res-panel h3 { font-size:14px; margin-bottom:8px; }
-  .res-item { padding:4px 0; border-bottom:1px dashed #eef0f2; }
+  .res-item { padding:4px 0; border-bottom:1px dashed #eef0f2; word-break:break-all; line-height:1.6; }
+  #modal-res-list .res-item { font-size:13px; padding:6px 0; }
+  #modal-res-list a { word-break:break-all; }
   .res-item a { color:var(--c1); }
   .hist { margin-top:6px; color:#7f8c8d; font-size:12px; line-height:1.6; }
   .empty { color:#95a5a6; padding:20px; text-align:center; background:#fff; border-radius:8px; }
@@ -221,22 +223,26 @@
 
 <!-- 项目弹窗 -->
 <div id="proj-mask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:60" onclick="closeProjModal()">
-  <div onclick="event.stopPropagation()" style="position:absolute;top:12%;left:50%;transform:translateX(-50%);width:400px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.25)">
-    <h3 style="margin-bottom:14px" id="proj-modal-title">新建项目</h3>
+  <div onclick="event.stopPropagation()" style="position:absolute;top:6%;left:50%;transform:translateX(-50%);width:680px;max-width:94vw;max-height:88vh;overflow-y:auto;background:#fff;border-radius:14px;padding:24px 26px;box-shadow:0 12px 48px rgba(0,0,0,.28)">
+    <h3 style="margin-bottom:16px" id="proj-modal-title">新建项目</h3>
     <div class="mform">
-      <label>项目名 *</label><input id="p-name">
+      <div style="display:flex;gap:14px">
+        <div style="flex:3"><label>项目名 *</label><input id="p-name"></div>
+        <div style="flex:2"><label>状态</label><select id="p-status"><option value="active">推进中</option><option value="paused">已搁置</option><option value="done">已完成</option></select></div>
+      </div>
       <label>目标</label><textarea id="p-desc" rows="2" placeholder="这个项目要达成什么？"></textarea>
-      <label>状态</label><select id="p-status"><option value="active">推进中</option><option value="paused">已搁置</option><option value="done">已完成</option></select>
       <label>项目截止日</label><input id="p-end" type="date">
       <div class="mops"><button onclick="closeProjModal()">取消</button><button class="primary" id="p-save">保存</button></div>
       <div id="modal-res-wrap" style="display:none">
-        <h5 style="font-size:12px;color:#7f8c8d;margin:16px 0 6px">项目资料（微信群 / 链接 / 备注）</h5>
+        <div style="border-top:1px solid #eef0f3;margin-top:18px;padding-top:14px">
+        <h5 style="font-size:13px;color:#5f6b76;margin:0 0 8px">📎 项目资料（微信群 / 链接 / 备注）</h5>
         <div id="modal-res-list"></div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <select id="mr-type" style="flex:0 0 92px"><option value="wechat_group">微信群</option><option value="link">链接</option><option value="note">备注</option></select>
           <input id="mr-label" placeholder="说明(可选)" style="flex:0 0 90px">
           <input id="mr-value" placeholder="群名或链接" style="flex:1">
           <button onclick="addProjResUI(editingProjId,'modal')" style="flex:0 0 46px">＋</button>
+        </div>
         </div>
       </div>
       <button id="p-del" class="dangerbtn" style="display:none">🗑 删除整个项目（含任务/资料/历史）</button>
