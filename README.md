@@ -84,6 +84,8 @@ npm run dev        # 启动；或 Windows 双击项目根 start-mypm.bat
 
 **切换模型**：`provider` 改成另一家的 id、`model` 改成它 models 里的 id，重启即换（如 `deepseek` + `deepseek-chat`）。新增厂家 = providers[] 抄一段改 baseUrl/key/models。
 
+模板 `config.example.json` 已内置 10 家主流厂商可直接抄用：智谱（双端点）、DeepSeek、Kimi、通义千问、OpenAI、Claude、硅基流动、OpenRouter、Ollama 本地。
+
 ### lark —— Lark/飞书 应用机器人
 
 | 字段 | 说明 |
