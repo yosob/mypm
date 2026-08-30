@@ -14,7 +14,7 @@ function fmtTask(t: db.Task): string {
 	const flags = [t.is_milestone ? "◆里程碑" : "", t.priority && t.priority !== "P3" ? t.priority : ""].filter(Boolean).join(" ");
 	const overdue = !t.done && t.due_date && t.due_date < localDate() ? "【逾期】" : "";
 	const sched = t.start_date && t.due_date ? ` ｜ ${t.start_date}~${t.due_date}` : t.due_date ? ` ｜ 截止 ${t.due_date}` : "";
-	return `[id=${t.id}] ${t.project_name} ｜ ${t.title}${sched} ｜ ${statusLabel}${flags ? ` ｜ ${flags}` : ""} ${overdue}`.trim();
+	return `${t.parent_id ? "└ " : ""}[id=${t.id}] ${t.project_name} ｜ ${t.title}${sched} ｜ ${statusLabel}${flags ? ` ｜ ${flags}` : ""} ${overdue}`.trim();
 }
 
 function fmtProject(p: db.Project, withTasks = true): string {
@@ -216,18 +216,39 @@ export const pmTools: AgentTool<any, any>[] = [
 	{
 		name: "create_task",
 		label: "新建任务",
-		description: "用户直接口述添加单个任务/待办时调用（无需确认流程）。日期用 YYYY-MM-DD。",
+		description: "用户直接口述添加单个任务/待办时调用（无需确认流程）。日期用 YYYY-MM-DD。拆子任务时传 parent_task_id（归属自动取父任务所在项目）。",
 		parameters: Type.Object({
-			project: Type.String({ description: "项目名（支持模糊匹配，不存在会新建）" }),
+			project: Type.String({ description: "项目名（支持模糊匹配，不存在会新建；传了 parent_task_id 时忽略，以父任务所在项目为准）" }),
 			title: Type.String({ description: "任务标题" }),
 			start_date: Type.Optional(Type.String({ description: "开始日 YYYY-MM-DD（有明确排期时填）" })),
 			due_date: Type.Optional(Type.String({ description: "截止日 YYYY-MM-DD" })),
 			description: Type.Optional(Type.String({ description: "补充说明" })),
 			is_milestone: Type.Optional(Type.Boolean({ description: "是否里程碑，默认否" })),
 			priority: Type.Optional(Type.String({ description: "优先级 P0最高~P3最低，默认P3" })),
+			parent_task_id: Type.Optional(Type.Number({ description: "父任务id（拆子任务时传）。子任务须与父同项目、最多一层" })),
 		}),
 		executionMode: "sequential",
 		async execute(_id, params: any) {
+			let parentId: number | null = params.parent_task_id ?? null;
+			if (parentId) {
+				const pt = db.getTask(parentId);
+				if (!pt) throw new Error(`父任务 ${parentId} 不存在`);
+				const err = db.validateParent(pt.project_id, parentId); // 深度一层等校验（同项目天然满足：以父为准）
+				if (err) throw new Error(err);
+				const t = db.createTask({
+					project_id: pt.project_id,
+					title: params.title,
+					start_date: params.start_date ?? null,
+					due_date: params.due_date ?? null,
+					description: params.description,
+					is_milestone: params.is_milestone,
+					priority: params.priority,
+					parent_id: parentId,
+				});
+				return ok(
+					`已添加子任务：${pt.title} └ ${t.title}${t.due_date ? ` ｜ 截止 ${t.due_date}` : ""} [id=${t.id}]（父任务完成时子任务自动完成）`,
+				);
+			}
 			let proj = db.findProject(params.project);
 			if (!proj) proj = db.createProject(params.project);
 			const t = db.createTask({
@@ -248,7 +269,7 @@ export const pmTools: AgentTool<any, any>[] = [
 		name: "update_task",
 		label: "修改任务",
 		description:
-			"改截止日/标记完成/改名/改状态时调用。需要任务id（可先用 list_tasks 查）。done 传 true 表示完成；status 取 todo(待办)/doing(进行中)/done(已完成)。",
+			"改截止日/标记完成/改名/改状态/调整父子关联时调用。需要任务id（可先用 list_tasks 查）。done 传 true 表示完成（父任务完成时未完成的子任务自动完成）；status 取 todo(待办)/doing(进行中)/done(已完成)。",
 		parameters: Type.Object({
 			task_id: Type.Number({ description: "任务id" }),
 			start_date: Type.Optional(Type.String({ description: "新开始日 YYYY-MM-DD" })),
@@ -257,9 +278,20 @@ export const pmTools: AgentTool<any, any>[] = [
 			title: Type.Optional(Type.String({ description: "新标题" })),
 			status: Type.Optional(Type.String({ description: "任务状态：todo/doing/done" })),
 			priority: Type.Optional(Type.String({ description: "优先级 P0~P3" })),
+			parent_task_id: Type.Optional(Type.Number({ description: "设为某任务的子任务（父任务id）；传 0 解除父子关联" })),
 		}),
 		executionMode: "sequential",
 		async execute(_id, params: any) {
+			const cur = db.getTask(params.task_id);
+			if (!cur) throw new Error(`任务 ${params.task_id} 不存在`);
+			let parentId: number | null | undefined = undefined;
+			if (params.parent_task_id !== undefined) {
+				parentId = params.parent_task_id ? Number(params.parent_task_id) : null;
+				if (parentId) {
+					const err = db.validateParent(cur.project_id, parentId, params.task_id);
+					if (err) throw new Error(err);
+				}
+			}
 			const t = db.updateTask(params.task_id, {
 				start_date: params.start_date === undefined ? undefined : (params.start_date as string | null),
 				due_date: params.due_date === undefined ? undefined : (params.due_date as string | null),
@@ -267,9 +299,11 @@ export const pmTools: AgentTool<any, any>[] = [
 				title: params.title,
 				status: params.status,
 				priority: params.priority,
+				parent_id: parentId,
 			});
 			if (!t) throw new Error(`任务 ${params.task_id} 不存在`);
-			return ok(`已更新：${fmtTask(t)}`);
+			const rel = parentId ? `（已挂为「${db.getTask(parentId)?.title ?? parentId}」的子任务）` : parentId === null ? "（已解除父子关联）" : "";
+			return ok(`已更新：${fmtTask(t)}${rel}`);
 		},
 	},
 	{

@@ -42,7 +42,7 @@
 | 优先级 | P0-P3，提醒排序用 | Todoist |
 | 重复任务 | 周报、例会（RRULE 简化版：每周N/每月N日） | Vikunja/Todoist |
 | 自然语言日期 | agent 对话里"下周三"自动解析 | Todoist |
-| 子任务 | task 的 parent_id | Vikunja |
+| ~~子任务~~ ✅ 2026-08-31 已上线 | task 的 parent_id：深度一层、同项目、父完成级联子完成（DECISIONS #39） | Vikunja |
 | 日历视图 | 月视图看排期 | Vikunja |
 | 任务依赖 | depends_on，甘特图画箭头 | GanttProject |
 | 手动触发"问 agent" | "本周进展汇总"生成周报卡片推飞书 | — |
@@ -55,7 +55,7 @@
 
 ```sql
 projects: id, name, description, status('active'|'archived'), created_at
-tasks:    id, project_id, parent_id NULL,      -- 子任务(P1)
+tasks:    id, project_id, parent_id NULL,      -- 子任务(已上线：一层/同项目/级联完成)
           title, description,
           due_date 'YYYY-MM-DD', done, done_at,
           is_milestone, priority 'P0'-'P3'(P1),

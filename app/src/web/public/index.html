@@ -257,11 +257,12 @@
 
 <!-- 新建任务弹窗 -->
 <div id="modal-mask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:60" onclick="closeModal()">
-  <div id="modal" onclick="event.stopPropagation()" style="position:absolute;top:12%;left:50%;transform:translateX(-50%);width:400px;background:#fff;border-radius:12px;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.25)">
+  <div id="modal" onclick="event.stopPropagation()" style="position:absolute;top:12%;left:50%;transform:translateX(-50%);width:400px;max-height:80vh;overflow-y:auto;background:#fff;border-radius:12px;padding:22px;box-shadow:0 8px 40px rgba(0,0,0,.25)">
     <h3 style="margin-bottom:14px">新建任务</h3>
     <div class="mform">
       <label>标题 *</label><input id="m-title" placeholder="要做什么？">
       <label>项目 *</label><select id="m-project"></select>
+      <label>父任务（选了即为子任务，最多一层）</label><select id="m-parent"></select>
       <label>开始日</label><input id="m-start" type="date">
       <label>截止日</label><input id="m-due" type="date">
       <label>状态</label><select id="m-status"><option value="todo">待办</option><option value="doing">进行中</option></select>
@@ -413,6 +414,7 @@ function renderGantt(ts,projs){
   const g=gantt;
   const today=localDate(new Date());
   const data=[];
+  const visible=new Set(ts.filter(t=>!t.done).map(t=>String(t.id))); // 子任务的父若被筛掉/已完成则回挂项目行，防孤儿引用
   projs.forEach((p,pi)=>{
     data.push({id:`p${p.id}`,text:`📁 ${p.name}`,open:true,type:"project",
       progress:p.tasks.length?Math.round(p.tasks.filter(t=>t.done).length/p.tasks.length*100)/100:0,color_idx:pi%6});
@@ -421,11 +423,12 @@ function renderGantt(ts,projs){
       const start=t.start_date||t.created_at;
       const due=t.due_date||addDays(start,7);
       const dur=Math.max(1,Math.round((Date.parse(due)-Date.parse(start))/864e5)+1);
-      data.push({id:String(t.id),text:(t.is_milestone?"◆ ":"")+t.title,
+      const gparent=(t.parent_id&&visible.has(String(t.parent_id)))?String(t.parent_id):`p${p.id}`;
+      data.push({id:String(t.id),text:(t.parent_id?"└ ":"")+(t.is_milestone?"◆ ":"")+t.title,
         start_date:t.is_milestone?(t.due_date||due):start,
         duration:t.is_milestone?1:dur,
         type:t.is_milestone?"milestone":"task",
-        parent:`p${p.id}`,color_idx:pi%6,due_txt:(t.due_date||"").slice(5),start_txt:(t.is_milestone?(t.due_date||due):start).slice(5),
+        parent:gparent,color_idx:pi%6,due_txt:(t.due_date||"").slice(5),start_txt:(t.is_milestone?(t.due_date||due):start).slice(5),
         warn:di.overdue?"overdue":di.soon?"soon":null});
     });
   });
@@ -480,7 +483,7 @@ function renderTable(ts){
     if(t.done)tr.className="done";
     const di=dueInfo(t), p=findProj(t.project_id);
     tr.innerHTML=`<td><input type="checkbox" ${t.done?"checked":""} data-id="${t.id}"></td>
-      <td>${t.is_milestone?"◆ ":""}${t.title}</td>
+      <td${t.parent_id?' style="padding-left:20px"':''}>${t.parent_id?'<span style="color:#8a95a1;margin-right:2px">└</span> ':""}${t.is_milestone?"◆ ":""}${t.title}</td>
       <td><span class="pflag" style="background:${projColor(t.project_id)}">${p?p.name:""}</span></td>
       <td><span class="badge ${statusOf(t)}">${STATUS_TXT[statusOf(t)]}</span></td>
       <td>${t.priority&&t.priority!=="P3"?`<b style="color:${t.priority==="P0"?"var(--danger)":t.priority==="P1"?"#d35400":"#7f8c8d"}">${t.priority}</b>`:"-"}</td>
@@ -508,7 +511,7 @@ function renderKanban(ts){
       const card=document.createElement("div");
       card.className="kcard";card.draggable=true;
       card.style.borderLeftColor=projColor(t.project_id);
-      card.innerHTML=`<div class="kt">${t.is_milestone?"◆ ":""}${t.title}</div>
+      card.innerHTML=`<div class="kt">${t.parent_id?"↳ ":""}${t.is_milestone?"◆ ":""}${t.title}</div>
         <div class="km"><span class="kp">${p?p.name:""}</span>
         ${t.due_date?`<span class="kd ${di.overdue?"overdue":di.soon?"soon":"norm"}">${di.txt}</span>`:""}</div>`;
       card.ondragstart=e=>e.dataTransfer.setData("text/plain",String(t.id));
@@ -726,9 +729,19 @@ async function delProjRes(rid,pid){
 }
 
 // ---------- 新建任务 ----------
+/** 填充父任务下拉：候选=该项目下未完成且自身非子任务的任务（排除自己）；noneTxt 为"无"选项文案 */
+function fillParentOptions(pid,selected,elId,noneTxt,selfId){
+  const el=document.getElementById(elId);
+  let cands=(findProj(pid)?.tasks||[]).filter(x=>!x.parent_id&&!x.done&&x.id!==selfId);
+  if(selected){const pt=findTask(selected);if(pt&&!cands.some(x=>x.id===pt.id))cands=[pt,...cands];} // 当前父即使已完成也保留可选
+  el.innerHTML=`<option value="">${noneTxt}</option>`+cands.map(x=>`<option value="${x.id}" ${selected===x.id?"selected":""}>${x.is_milestone?"◆ ":""}${x.title}</option>`).join("");
+  return el;
+}
 function openModal(){
   const sel=document.getElementById("m-project");
   sel.innerHTML=DATA.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+  fillParentOptions(sel.value,null,"m-parent","（无 · 普通任务）",null);
+  sel.onchange=()=>fillParentOptions(sel.value,null,"m-parent","（无 · 普通任务）",null);
   document.getElementById("m-title").value="";
   document.getElementById("m-start").value="";
   document.getElementById("m-due").value="";
@@ -744,6 +757,7 @@ async function saveTask(){
   const title=document.getElementById("m-title").value.trim();
   if(!title)return alert("请填标题");
   const body={title,project_id:+document.getElementById("m-project").value,
+    parent_id:+document.getElementById("m-parent").value||null,
     start_date:document.getElementById("m-start").value||null,
     priority:document.getElementById("m-priority").value,
     due_date:document.getElementById("m-due").value||null,
@@ -815,21 +829,25 @@ function editDetail(id){
     <div style="display:flex;gap:10px">
       <div class="editrow" style="flex:1"><label>优先级</label><select id="e-priority">${["P3","P2","P1","P0"].map(x=>`<option value="${x}" ${t.priority===x?"selected":""}>${x}</option>`).join("")}</select></div>
     </div>
+    <div class="editrow"><label>父任务（选"无"解除子任务关联）</label><select id="e-parent"></select></div>
     <div class="editrow"><label>内容 / 备注</label><textarea id="e-desc" rows="4">${t.description||""}</textarea></div>
   </div>
   <div class="dt-foot">
     <button onclick="fillDetail(${id})">取消</button>
     <button class="primary" onclick="saveEdit(${id})">保存</button>
   </div>`;
+  fillParentOptions(t.project_id,t.parent_id,"e-parent","（无 · 独立任务）",t.id);
 }
 async function saveEdit(id){
   const body={title:document.getElementById("e-title").value.trim()||undefined,
     start_date:document.getElementById("e-start").value||null,
     due_date:document.getElementById("e-due").value||null,
     priority:document.getElementById("e-priority").value,
+    parent_id:+document.getElementById("e-parent").value||null,
     description:document.getElementById("e-desc").value};
   const r=await fetch(`/api/tasks/${id}/update`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-  if(!r.ok)return alert("保存失败");
+  if(!r.ok){const e=await r.json().catch(()=>({}));return alert("保存失败："+(e.error||r.status));}
+  editing=false;
   load();fillDetail(id);
 }
 async function deleteTaskUI(id){

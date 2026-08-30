@@ -59,6 +59,11 @@ export function startWeb(port: number) {
 		const b = await c.req.json<any>().catch(() => null);
 		if (!b?.title || !b?.project_id) return c.json({ error: "title 与 project_id 必填" }, 400);
 		for (const k of ["due_date", "start_date"]) if (b[k] && !/^\d{4}-\d{2}-\d{2}$/.test(b[k])) return c.json({ error: `${k} 需 YYYY-MM-DD` }, 400);
+		const parentId = b.parent_id ? Number(b.parent_id) : null;
+		if (parentId) {
+			const err = db.validateParent(Number(b.project_id), parentId);
+			if (err) return c.json({ error: err }, 400);
+		}
 		const t = db.createTask({
 			project_id: Number(b.project_id),
 			title: String(b.title),
@@ -67,7 +72,7 @@ export function startWeb(port: number) {
 			description: b.description || "",
 			is_milestone: !!b.is_milestone,
 			priority: ["P0", "P1", "P2", "P3"].includes(b.priority) ? b.priority : "P3",
-			parent_id: b.parent_id ? Number(b.parent_id) : null,
+			parent_id: parentId,
 		});
 		if (b.status && ["todo", "doing", "done"].includes(b.status)) db.updateTask(t.id, { status: b.status, done: b.status === "done" });
 		return c.json(db.getTask(t.id));
@@ -77,14 +82,21 @@ export function startWeb(port: number) {
 	app.post("/api/tasks/:id/update", async (c) => {
 		const id = Number(c.req.param("id"));
 		const b = await c.req.json<any>().catch(() => null);
-		if (!db.getTask(id)) return c.json({ error: "not found" }, 404);
+		const existing = db.getTask(id);
+		if (!existing) return c.json({ error: "not found" }, 404);
 		const patch: db.UpdatePatch = {};
 		if (b.title !== undefined) patch.title = String(b.title);
 		if (b.description !== undefined) patch.description = String(b.description);
 		if (b.due_date !== undefined) patch.due_date = b.due_date ? String(b.due_date) : null;
 		if (b.start_date !== undefined) patch.start_date = b.start_date ? String(b.start_date) : null;
 		if (b.priority !== undefined && ["P0", "P1", "P2", "P3"].includes(b.priority)) patch.priority = b.priority;
-		if (b.parent_id !== undefined) patch.parent_id = b.parent_id ? Number(b.parent_id) : null;
+		if (b.parent_id !== undefined) {
+			patch.parent_id = b.parent_id ? Number(b.parent_id) : null;
+			if (patch.parent_id) {
+				const err = db.validateParent(existing.project_id, patch.parent_id, id);
+				if (err) return c.json({ error: err }, 400);
+			}
+		}
 		const t = db.updateTask(id, patch);
 		return c.json(t);
 	});

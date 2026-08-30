@@ -346,7 +346,24 @@ export function updateTask(
 	db.prepare(
 		"UPDATE tasks SET due_date=?, start_date=?, done=?, done_at=?, title=?, description=?, status=?, priority=?, parent_id=? WHERE id=?",
 	).run(due, startDate, done, done ? today() : null, title, desc, status, priority, parentId, id);
+	// 级联完成：父任务完成时，未完成的子任务一并完成（AI 与看板共用此路径）
+	if (patch.done === true && !t.done) {
+		db.prepare("UPDATE tasks SET done=1, done_at=?, status='done' WHERE parent_id=? AND done=0").run(today(), id);
+	}
 	return getTask(id);
+}
+
+/**
+ * 子任务父引用校验（DECISIONS #39）：返回错误文案，null=合法。
+ * 约束：父任务存在、同项目、深度最多一层（父自身不能是子任务）、不能自引用。
+ */
+export function validateParent(projectId: number, parentId: number, selfId?: number): string | null {
+	if (selfId && parentId === selfId) return "父任务不能是任务自己";
+	const p = getTask(parentId);
+	if (!p) return `父任务 ${parentId} 不存在`;
+	if (p.project_id !== projectId) return `子任务必须与父任务属于同一项目（「${p.title}」属于其他项目）`;
+	if (p.parent_id) return `「${p.title}」本身已是子任务，子任务不能再挂子任务（最多一层）`;
+	return null;
 }
 
 export function deleteTask(id: number): boolean {
