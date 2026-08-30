@@ -27,7 +27,7 @@ export type AppConfig = {
 	};
 	lark: { appId: string; appSecret: string; domain: "lark" | "feishu" };
 	notify: { webhook: string };
-	app: { port: number; remindDays: number; remindCron: string; sessionMax: number; sessionKeep: number };
+	app: { port: number; remindDays: number; remindHighlightDays: number; remindCron: string; sessionMax: number; sessionKeep: number };
 };
 
 const DEFAULTS: AppConfig = {
@@ -47,7 +47,7 @@ const DEFAULTS: AppConfig = {
 	},
 	lark: { appId: "", appSecret: "", domain: "lark" },
 	notify: { webhook: "" },
-	app: { port: 8787, remindDays: 7, remindCron: "0 9 * * *", sessionMax: 200, sessionKeep: 50 },
+	app: { port: 8787, remindDays: 7, remindHighlightDays: 3, remindCron: "0 9 * * *", sessionMax: 200, sessionKeep: 50 },
 };
 
 /** $VAR / ${VAR} 环境变量引用解析；$$ 转义字面量；未定义变量→空串并警告 */

@@ -137,3 +137,11 @@ RAG-MCP（按查询动态注入工具）适用于几十上百个工具的规模�
   state.systemPrompt（日期也随之跨天更新）——os.networkInterfaces() 成本微秒级
 - 否决"加 get_dashboard_url 工具"方案：动态信息若可廉价预知，prompt 每轮刷新
   优于工具（免一轮调用、工具数维持 14 不增）；真正"调用时才产生"的信息才值得做工具
+
+## 决议 #37（2026-08-31）：提醒机制改为每日重复 + 三档分级（阈值可配）
+
+- 旧机制（进窗口提醒一次+逾期日一次）信息量不足；改为：窗口内（remindDays，默认7）
+  每天提醒直到完成；≤remindHighlightDays（默认3，新增配置）为重点档❗，逾期为红色档
+- 卡片三段式：🔴逾期 / 🟠N天内重点 / ⚪窗口内普通；模板色 red/orange/blue
+- reminders 表重构（task_id,date 按天去重，替代旧 task_id,kind 一次性去重），
+  旧表自动重建（去重态数据可弃）；同日多次 runCheck 只发一张卡

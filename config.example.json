@@ -10,8 +10,18 @@
         "api": "openai-completions",
         "apiKey": "$ZAI_CODING_CN_API_KEY",
         "models": [
-          { "id": "glm-4.7", "name": "GLM 4.7", "contextWindow": 128000, "maxTokens": 32000 },
-          { "id": "glm-5.3", "name": "GLM 5.3", "contextWindow": 128000, "maxTokens": 32000 }
+          {
+            "id": "glm-4.7",
+            "name": "GLM 4.7",
+            "contextWindow": 128000,
+            "maxTokens": 32000
+          },
+          {
+            "id": "glm-5.3",
+            "name": "GLM 5.3",
+            "contextWindow": 128000,
+            "maxTokens": 32000
+          }
         ]
       },
       {
@@ -20,7 +30,12 @@
         "baseUrl": "https://open.bigmodel.cn/api/anthropic",
         "api": "anthropic-messages",
         "apiKey": "$ZAI_CODING_CN_API_KEY",
-        "models": [{ "id": "glm-4.7", "name": "GLM 4.7 (Anthropic协议)" }]
+        "models": [
+          {
+            "id": "glm-4.7",
+            "name": "GLM 4.7 (Anthropic协议)"
+          }
+        ]
       },
       {
         "id": "deepseek",
@@ -29,8 +44,18 @@
         "api": "openai-completions",
         "apiKey": "$DEEPSEEK_API_KEY",
         "models": [
-          { "id": "deepseek-chat", "name": "DeepSeek V3 通用", "contextWindow": 128000, "maxTokens": 8192 },
-          { "id": "deepseek-reasoner", "name": "DeepSeek R1 推理", "contextWindow": 128000, "maxTokens": 8192 }
+          {
+            "id": "deepseek-chat",
+            "name": "DeepSeek V3 通用",
+            "contextWindow": 128000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "deepseek-reasoner",
+            "name": "DeepSeek R1 推理",
+            "contextWindow": 128000,
+            "maxTokens": 8192
+          }
         ]
       },
       {
@@ -40,8 +65,18 @@
         "api": "openai-completions",
         "apiKey": "$MOONSHOT_API_KEY",
         "models": [
-          { "id": "kimi-k2-turbo-preview", "name": "Kimi K2 Turbo", "contextWindow": 128000, "maxTokens": 8192 },
-          { "id": "kimi-k2-0905-preview", "name": "Kimi K2", "contextWindow": 128000, "maxTokens": 8192 }
+          {
+            "id": "kimi-k2-turbo-preview",
+            "name": "Kimi K2 Turbo",
+            "contextWindow": 128000,
+            "maxTokens": 8192
+          },
+          {
+            "id": "kimi-k2-0905-preview",
+            "name": "Kimi K2",
+            "contextWindow": 128000,
+            "maxTokens": 8192
+          }
         ]
       },
       {
@@ -51,8 +86,18 @@
         "api": "openai-completions",
         "apiKey": "$DASHSCOPE_API_KEY",
         "models": [
-          { "id": "qwen-max", "name": "Qwen Max", "contextWindow": 131072, "maxTokens": 8192 },
-          { "id": "qwen-plus", "name": "Qwen Plus（性价比）", "contextWindow": 131072, "maxTokens": 8192 }
+          {
+            "id": "qwen-max",
+            "name": "Qwen Max",
+            "contextWindow": 131072,
+            "maxTokens": 8192
+          },
+          {
+            "id": "qwen-plus",
+            "name": "Qwen Plus（性价比）",
+            "contextWindow": 131072,
+            "maxTokens": 8192
+          }
         ]
       },
       {
@@ -62,8 +107,18 @@
         "api": "openai-completions",
         "apiKey": "$OPENAI_API_KEY",
         "models": [
-          { "id": "gpt-4o", "name": "GPT-4o", "contextWindow": 128000, "maxTokens": 16384 },
-          { "id": "gpt-4.1-mini", "name": "GPT-4.1 mini（便宜）", "contextWindow": 1000000, "maxTokens": 32768 }
+          {
+            "id": "gpt-4o",
+            "name": "GPT-4o",
+            "contextWindow": 128000,
+            "maxTokens": 16384
+          },
+          {
+            "id": "gpt-4.1-mini",
+            "name": "GPT-4.1 mini（便宜）",
+            "contextWindow": 1000000,
+            "maxTokens": 32768
+          }
         ]
       },
       {
@@ -73,8 +128,18 @@
         "api": "anthropic-messages",
         "apiKey": "$ANTHROPIC_API_KEY",
         "models": [
-          { "id": "claude-sonnet-4-5", "name": "Claude Sonnet 4.5（均衡）", "contextWindow": 200000, "maxTokens": 64000 },
-          { "id": "claude-opus-4-5", "name": "Claude Opus 4.5（旗舰）", "contextWindow": 200000, "maxTokens": 32000 }
+          {
+            "id": "claude-sonnet-4-5",
+            "name": "Claude Sonnet 4.5（均衡）",
+            "contextWindow": 200000,
+            "maxTokens": 64000
+          },
+          {
+            "id": "claude-opus-4-5",
+            "name": "Claude Opus 4.5（旗舰）",
+            "contextWindow": 200000,
+            "maxTokens": 32000
+          }
         ]
       },
       {
@@ -84,8 +149,18 @@
         "api": "openai-completions",
         "apiKey": "$SILICONFLOW_API_KEY",
         "models": [
-          { "id": "deepseek-ai/DeepSeek-V3", "name": "DeepSeek V3（硅基）", "contextWindow": 65536, "maxTokens": 8192 },
-          { "id": "Qwen/Qwen2.5-72B-Instruct", "name": "Qwen2.5 72B（硅基）", "contextWindow": 32768, "maxTokens": 8192 }
+          {
+            "id": "deepseek-ai/DeepSeek-V3",
+            "name": "DeepSeek V3（硅基）",
+            "contextWindow": 65536,
+            "maxTokens": 8192
+          },
+          {
+            "id": "Qwen/Qwen2.5-72B-Instruct",
+            "name": "Qwen2.5 72B（硅基）",
+            "contextWindow": 32768,
+            "maxTokens": 8192
+          }
         ]
       },
       {
@@ -95,8 +170,18 @@
         "api": "openai-completions",
         "apiKey": "$OPENROUTER_API_KEY",
         "models": [
-          { "id": "anthropic/claude-sonnet-4.5", "name": "Claude Sonnet 4.5（OR）", "contextWindow": 200000, "maxTokens": 64000 },
-          { "id": "google/gemini-2.5-pro", "name": "Gemini 2.5 Pro（OR）", "contextWindow": 1000000, "maxTokens": 65536 }
+          {
+            "id": "anthropic/claude-sonnet-4.5",
+            "name": "Claude Sonnet 4.5（OR）",
+            "contextWindow": 200000,
+            "maxTokens": 64000
+          },
+          {
+            "id": "google/gemini-2.5-pro",
+            "name": "Gemini 2.5 Pro（OR）",
+            "contextWindow": 1000000,
+            "maxTokens": 65536
+          }
         ]
       },
       {
@@ -106,7 +191,12 @@
         "api": "openai-completions",
         "apiKey": "ollama",
         "models": [
-          { "id": "qwen3:8b", "name": "Qwen3 8B 本地", "contextWindow": 32768, "maxTokens": 8192 }
+          {
+            "id": "qwen3:8b",
+            "name": "Qwen3 8B 本地",
+            "contextWindow": 32768,
+            "maxTokens": 8192
+          }
         ]
       }
     ]
@@ -122,6 +212,7 @@
   "app": {
     "port": 8787,
     "remindDays": 7,
+    "remindHighlightDays": 3,
     "remindCron": "0 9 * * *",
     "sessionMax": 200,
     "sessionKeep": 50

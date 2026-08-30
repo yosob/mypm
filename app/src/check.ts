@@ -5,49 +5,47 @@ import { backup } from "./db";
 import { notifyCard } from "./notify";
 import { log } from "./paths";
 
+function taskLine(t: db.Task, today: string, strong: boolean): string {
+	const left = Math.round((Date.parse(t.due_date!) - Date.parse(today)) / 86400_000);
+	const when = left < 0 ? `**已逾期 ${-left} 天**` : left === 0 ? "**今天到期**" : `还剩 ${left} 天`;
+	return `${strong ? "❗" : "•"} **${t.project_name}** ｜ ${t.title} ｜ 截止 ${t.due_date} ｜ ${when}`;
+}
+
 /**
- * 每日检查：进入提醒窗口的任务提醒一次（kind=window），
- * 逾期当天再提醒一次（kind=overdue）。已提醒过的不再重复。
+ * 每日提醒（remindCron 时刻触发；runCheck 可手动重复执行，同日不重发）：
+ * - 逾期 / ≤ remindHighlightDays 天：重点档（❗ + 橙/红卡片）
+ * - 其余 ≤ remindDays 天：普通档
+ * 每个任务每天提醒一次，直到完成或移出窗口
  */
 export async function runCheck(opts: { withBackup?: boolean } = {}) {
 	const today = localDate();
-	const days = config.app.remindDays;
-	const horizon = localDate(new Date(Date.now() + days * 86400_000));
+	const window = config.app.remindDays;
+	const highlight = config.app.remindHighlightDays;
 
-	const tasks = db.listTasks({ dueWithinDays: days }); // 含逾期（due <= today+N）
-	const windowLines: string[] = [];
-	const overdueLines: string[] = [];
+	const overdue: string[] = [];
+	const soon: string[] = [];
+	const week: string[] = [];
 
-	for (const t of tasks) {
+	for (const t of db.listTasks({ dueWithinDays: window })) {
 		if (!t.due_date) continue;
-		if (t.due_date < today) {
-			if (!db.alreadyReminded(t.id, "overdue") && !db.alreadyReminded(t.id, "window")) {
-				// 只有从未提醒过且已直接逾期的，按逾期提醒
-				overdueLines.push(`**${t.project_name}** ｜ ${t.title} ｜ 原截止 ${t.due_date} ｜ **已逾期**`);
-				db.markReminded(t.id, "overdue");
-			}
-			continue;
-		}
-		if (t.due_date <= horizon && !db.alreadyReminded(t.id, "window")) {
-			const left = Math.round((Date.parse(t.due_date) - Date.parse(today)) / 86400_000);
-			const status = left === 0 ? "⚠️ **今天到期**" : `还剩 ${left} 天`;
-			windowLines.push(`**${t.project_name}** ｜ ${t.title} ｜ 截止 ${t.due_date} ｜ ${status}`);
-			db.markReminded(t.id, "window");
-		}
+		if (db.alreadyRemindedToday(t.id, today)) continue; // 同日已提醒（含本次启动前发过）
+		db.markRemindedToday(t.id, today);
+		const left = Math.round((Date.parse(t.due_date) - Date.parse(today)) / 86400_000);
+		if (left < 0) overdue.push(taskLine(t, today, true));
+		else if (left <= highlight) soon.push(taskLine(t, today, true));
+		else week.push(taskLine(t, today, false));
 	}
 
-	// 逾期日当天补一次提醒（曾按 window 提醒过、现在逾期且未按 overdue 提醒过）
-	const overdue2 = db.listTasks({ includeDone: false }).filter((t) => t.due_date && t.due_date < today);
-	for (const t of overdue2) {
-		if (!db.alreadyReminded(t.id, "overdue")) {
-			overdueLines.push(`**${t.project_name}** ｜ ${t.title} ｜ 原截止 ${t.due_date} ｜ **已逾期**`);
-			db.markReminded(t.id, "overdue");
-		}
+	if (overdue.length || soon.length || week.length) {
+		const parts: string[] = [];
+		if (overdue.length) parts.push("**🔴 已逾期（请尽快处理）**\n" + overdue.join("\n"));
+		if (soon.length) parts.push(`**🟠 ${highlight} 天内到期（重点）**\n` + soon.join("\n"));
+		if (week.length) parts.push(`**⚪ ${window} 天内到期**\n` + week.join("\n"));
+		const template = overdue.length ? "red" : soon.length ? "orange" : "blue";
+		await notifyCard(`📋 每日项目提醒（${today}）`, parts, template);
+	} else {
+		log("今日提醒卡片已发过或暂无窗口内任务");
 	}
-
-	const lines = [...overdueLines, ...windowLines];
-	if (lines.length) await notifyCard(`📋 项目提醒（${today}）`, lines, overdueLines.length ? "red" : "blue");
-	else log("今日无需提醒的任务");
 
 	if (opts.withBackup !== false) {
 		try {

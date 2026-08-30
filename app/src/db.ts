@@ -51,9 +51,8 @@ CREATE TABLE IF NOT EXISTS pending_updates(
 );
 CREATE TABLE IF NOT EXISTS reminders(
   task_id INTEGER NOT NULL,
-  kind TEXT NOT NULL,             -- window | overdue
-  date TEXT NOT NULL,
-  PRIMARY KEY (task_id, kind)
+  date TEXT NOT NULL,             -- 该任务此日已提醒（按天去重，支持每日重复）
+  PRIMARY KEY (task_id, date)
 );
 CREATE TABLE IF NOT EXISTS agent_sessions(
   chat_key TEXT PRIMARY KEY,
@@ -97,6 +96,16 @@ function migrate(db: Database.Database) {
 	};
 	addCol("tasks", "start_date", "start_date TEXT");
 	addCol("tasks", "custom_json", "custom_json TEXT");
+	// 旧 reminders 表（task_id,kind 主键）→ 新表（按天去重）；旧数据为一次性去重态，直接重建
+	const rc = (db.prepare("PRAGMA table_info(reminders)").all() as { name: string }[]).map((c) => c.name);
+	if (rc.includes("kind")) {
+		db.exec("DROP TABLE reminders");
+		db.exec(`CREATE TABLE reminders(
+  task_id INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  PRIMARY KEY (task_id, date)
+)`);
+	}
 	addCol("projects", "end_date", "end_date TEXT");
 }
 
@@ -504,12 +513,12 @@ export function applyPending(id: number): { ok: boolean; text: string } {
 
 // ---------- reminders ----------
 
-export function alreadyReminded(taskId: number, kind: "window" | "overdue"): boolean {
-	return !!db.prepare("SELECT 1 FROM reminders WHERE task_id=? AND kind=?").get(taskId, kind);
+export function alreadyRemindedToday(taskId: number, date = today()): boolean {
+	return !!db.prepare("SELECT 1 FROM reminders WHERE task_id=? AND date=?").get(taskId, date);
 }
 
-export function markReminded(taskId: number, kind: "window" | "overdue") {
-	db.prepare("INSERT OR REPLACE INTO reminders(task_id, kind, date) VALUES(?,?,?)").run(taskId, kind, today());
+export function markRemindedToday(taskId: number, date = today()) {
+	db.prepare("INSERT OR REPLACE INTO reminders(task_id, date) VALUES(?,?)").run(taskId, date);
 }
 
 // ---------- agent sessions ----------
