@@ -1,4 +1,5 @@
 import { Agent } from "@earendil-works/pi-agent-core";
+import os from "node:os";
 import { localDate, log } from "./paths";
 import { config } from "./config";
 import { model, streamFn, summarizeHistory } from "./ai";
@@ -11,10 +12,25 @@ process.env.TZ = "Asia/Shanghai";
 const SESSION_MAX = config.app.sessionMax;
 const SESSION_KEEP = config.app.sessionKeep;
 
+/** 本机局域网 IPv4（缓存；进程生命周期内视为不变） */
+const _ips = (() => {
+	const out: string[] = [];
+	for (const list of Object.values(os.networkInterfaces())) {
+		for (const ni of list ?? []) {
+			if (ni.family === "IPv4" && !ni.internal && /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ni.address)) {
+				out.push(ni.address);
+			}
+		}
+	}
+	return [...new Set(out)];
+})();
+
 export function systemPrompt(): string {
 	const d = new Date();
 	const week = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
+	const lanUrls = _ips.map((ip) => `http://${ip}:${config.app.port}`).join("、");
 	return `你是 yosob 的个人项目管理助手（AI PM）。今天日期：${localDate(d)} 星期${week}。你通过工具操作一个本地项目库。
+网页看板地址：本机 http://127.0.0.1:${config.app.port}${lanUrls ? `；同一局域网（如手机）${lanUrls}` : ""}。用户问怎么看板/地址是多少时直接告知（局域网地址含端口）；提醒公网访问需自行做内网穿透。
 
 行为规则：
 1. 绝不编造数据。任何项目/任务信息必须来自工具返回结果。

@@ -189,7 +189,7 @@ export function startWeb(port: number) {
 
 	app.use("/*", serveStatic({ root: path.join(APP_DIR, "src/web/public").replace(/\\/g, "/") }));
 
-	serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
+	serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, (info) => {
 		console.log(`看板: http://127.0.0.1:${info.port}`);
 	});
 	return app;

@@ -57,6 +57,7 @@ npm run dev        # 启动（Windows/Mac/Linux 通用）
 ```
 
 - 看板：http://127.0.0.1:8787 ｜ Lark：私聊机器人说句"你好"（首次私聊会记住你，用于提醒推送）
+- 同一路由器/WiFi 下的设备可直接访问看板（问机器人"看板地址是多少"它会告诉你局域网地址；Windows 首次启动防火墙弹窗需允许）
 - 首次运行会**自动创建**数据库 `app/data/mypm.db` 及 `logs/`、`backups/` 目录——克隆后唯一要准备的只有 `config.json`
 
 ## 配置说明（config.json）

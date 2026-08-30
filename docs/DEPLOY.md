@@ -106,7 +106,8 @@ launchctl unload ~/Library/LaunchAgents/com.mypm.app.plist # 停用
 | 启动报 `Provider is not configured: zai-coding-cn` | `config.json` 缺失或 glm.apiKey 为空/其 $ENV 未定义；按 config.example.json 检查 |
 | Lark 收不到消息 | ① 日志有无 `Lark WebSocket 已连接`；② **旧机服务是否还开着**（分流事故）；③ 换网络后公司代理拦 wss |
 | 提醒/日期差一天 | 机器时区需为 Asia/Shanghai（`sudo systemsetup -settimezone Asia/Shanghai`） |
-| 看板想远程访问 | 监听是 127.0.0.1；用 frp/tailscale/cloudflare tunnel 转发 8787 端口（加鉴权后再公网） |
+| 局域网设备打不开看板 | 服务已监听 0.0.0.0:8787；检查 Windows 防火墙首次弹窗是否放行（专用网络） |
+| 公网访问 | 用 frp/tailscale/cloudflare tunnel 转发 8787，务必先加鉴权 |
 | 数据库损坏告警 | 自动从 backups/ 恢复最近一份；平时别用网盘**实时**同步 mypm.db（本项目按百度网盘同步设计过，备份机制会兜底） |
 
 ## 七、迁移后回归清单
