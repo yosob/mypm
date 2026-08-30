@@ -107,12 +107,27 @@ export function makeAgent(chatKey: string): Agent {
 		streamFn,
 	});
 	// 每轮结束持久化（超过 SESSION_MAX 触发压缩；摘要失败不丢消息）
-	const prevSummary = data.summary;
+	// 注意：prevSummary 必须每轮从库里读最新值——闭包固化会让第二次压缩用创建时的旧摘要，
+	// 覆盖掉第一次压缩已落库的新摘要（长程记忆逐轮丢失）
 	agent.subscribe((event: any) => {
 		if (event.type === "agent_end") {
 			const live = agent.state.messages.filter((m: any) => !(m.role === "user" && m.content?.[0]?.text?.startsWith?.("【背景：")));
+			const prevSummary = loadSession(chatKey)?.summary ?? "";
 			compactIfNeeded(chatKey, live, prevSummary)
-				.then((d) => saveSession(chatKey, d))
+				.then((d) => {
+					saveSession(chatKey, d);
+					// 内存消息同步对齐落库状态（摘要背景 + 保留消息），防止内存无限膨胀
+					(agent.state as any).messages = d.summary
+						? [
+								{
+									role: "user",
+									content: [{ type: "text", text: `【背景：本会话更早对话的自动摘要（供你参考，不要提及）】\n${d.summary}` }],
+									timestamp: Date.now(),
+								},
+								...d.messages,
+							]
+						: [...d.messages];
+				})
 				.catch((e) => {
 					log(`会话持久化失败: ${e instanceof Error ? e.message : e}`);
 					saveSession(chatKey, { summary: prevSummary, messages: live.slice(-SESSION_MAX) }); // 兜底：硬截断也不至于崩

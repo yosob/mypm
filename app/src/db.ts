@@ -243,6 +243,8 @@ export function deleteProject(id: number): boolean {
 	const del = db.transaction(() => {
 		db.prepare("DELETE FROM task_resources WHERE task_id IN (SELECT id FROM tasks WHERE project_id=?)").run(id);
 		db.prepare("DELETE FROM reminders WHERE task_id IN (SELECT id FROM tasks WHERE project_id=?)").run(id);
+		// 其他项目的任务若引用本项目任务为父，先解引用（否则 FK 约束导致删除失败）
+		db.prepare("UPDATE tasks SET parent_id=NULL WHERE parent_id IN (SELECT id FROM tasks WHERE project_id=?)").run(id);
 		db.prepare("DELETE FROM tasks WHERE project_id=?").run(id);
 		db.prepare("DELETE FROM resources WHERE project_id=?").run(id);
 		db.prepare("DELETE FROM history WHERE project_id=?").run(id);

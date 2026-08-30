@@ -15,9 +15,11 @@ function taskLine(t: db.Task, today: string, strong: boolean): string {
  * 每日提醒（remindCron 时刻触发；runCheck 可手动重复执行，同日不重发）：
  * - 逾期 / ≤ remindHighlightDays 天：重点档（❗ + 橙/红卡片）
  * - 其余 ≤ remindDays 天：普通档
- * 每个任务每天提醒一次，直到完成或移出窗口
+ * 每个任务每天提醒一次，直到完成或移出窗口。
+ * 发送成功才标记"已提醒"——通知通道失败当日不丢，下次检查自动重试。
  */
-export async function runCheck(opts: { withBackup?: boolean } = {}) {
+export async function runCheck(opts: { withBackup?: boolean; notify?: typeof notifyCard } = {}) {
+	const notify = opts.notify ?? notifyCard;
 	const today = localDate();
 	const window = config.app.remindDays;
 	const highlight = config.app.remindHighlightDays;
@@ -25,11 +27,12 @@ export async function runCheck(opts: { withBackup?: boolean } = {}) {
 	const overdue: string[] = [];
 	const soon: string[] = [];
 	const week: string[] = [];
+	const fresh: db.Task[] = []; // 本次待提醒的任务（发送成功后才标记）
 
 	for (const t of db.listTasks({ dueWithinDays: window })) {
 		if (!t.due_date) continue;
 		if (db.alreadyRemindedToday(t.id, today)) continue; // 同日已提醒（含本次启动前发过）
-		db.markRemindedToday(t.id, today);
+		fresh.push(t);
 		const left = Math.round((Date.parse(t.due_date) - Date.parse(today)) / 86400_000);
 		if (left < 0) overdue.push(taskLine(t, today, true));
 		else if (left <= highlight) soon.push(taskLine(t, today, true));
@@ -42,7 +45,13 @@ export async function runCheck(opts: { withBackup?: boolean } = {}) {
 		if (soon.length) parts.push(`**🟠 ${highlight} 天内到期（重点）**\n` + soon.join("\n"));
 		if (week.length) parts.push(`**⚪ ${window} 天内到期**\n` + week.join("\n"));
 		const template = overdue.length ? "red" : soon.length ? "orange" : "blue";
-		await notifyCard(`📋 每日项目提醒（${today}）`, parts, template);
+		const sent = await notify(`📋 每日项目提醒（${today}）`, parts, template);
+		if (sent) {
+			for (const t of fresh) db.markRemindedToday(t.id, today);
+			log(`提醒已发送并标记：逾期${overdue.length} 重点${soon.length} 普通${week.length}`);
+		} else {
+			log("提醒发送失败（所有通道不可用），本次不标记，下次检查自动重试");
+		}
 	} else {
 		log("今日提醒卡片已发过或暂无窗口内任务");
 	}

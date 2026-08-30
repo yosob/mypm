@@ -116,9 +116,10 @@ export async function completeText(systemPrompt: string, userContent: string): P
 /** 纪要 → 结构化拟更新。失败自动重试一次。 */
 export async function extractUpdates(content: string): Promise<ExtractedUpdate> {
 	const names = listProjects().map((p) => `- ${p.name}`).join("\n") || "（暂无项目）";
+	// 替换串必须走函数形式：内容含 $&、$'、$1 等序列时字符串形式会被解释改写
 	const prompt = EXTRACT_PROMPT.replace("{today}", localDate())
-		.replace("{projects}", names)
-		.replace("{content}", content);
+		.replace("{projects}", () => names)
+		.replace("{content}", () => content);
 
 	let lastErr: unknown;
 	for (let attempt = 0; attempt < 2; attempt++) {
@@ -161,7 +162,7 @@ export async function summarizeHistory(prev: string, older: any[]): Promise<stri
 		})
 		.join("\n")
 		.slice(0, 24000);
-	const prompt = SUMMARIZE_PROMPT.replace("{prev}", prev || "（无）").replace("{older}", transcript);
+	const prompt = SUMMARIZE_PROMPT.replace("{prev}", () => prev || "（无）").replace("{older}", () => transcript);
 	try {
 		const out = await completeText("你是对话摘要器。", prompt);
 		return out.trim() || prev;

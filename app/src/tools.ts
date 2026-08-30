@@ -3,7 +3,7 @@ import { localDate } from "./paths";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import * as db from "./db";
 import { extractUpdates } from "./ai";
-import { scheduleCron } from "./timers";
+import { scheduleCron, stopCron } from "./timers";
 
 function ok(text: string) {
 	return { content: [{ type: "text" as const, text }], details: {} };
@@ -313,6 +313,7 @@ export const pmTools: AgentTool<any, any>[] = [
 		executionMode: "sequential",
 		async execute(_id, params: any) {
 			if (!db.cancelTimer(params.timer_id)) throw new Error(`定时器 ${params.timer_id} 不存在或已结束`);
+			stopCron(params.timer_id); // 同步停掉内存中的 cron 调度（否则周期任务会继续触发到进程重启）
 			return ok(`已取消定时提醒 [id=${params.timer_id}]`);
 		},
 	},

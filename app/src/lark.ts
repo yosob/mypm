@@ -65,6 +65,17 @@ function cardContent(larkMd: string) {
 	return JSON.stringify({ elements: [{ tag: "div", text: { tag: "lark_md", content: larkMd } }] });
 }
 
+/**
+ * 群消息是否 @了本机器人：mention 的 open_id 必须命中 bot 自身。
+ * bot 身份未知时退化为"有 @ 就响应"（避免 bot info 拉取失败导致群聊完全失联）。
+ */
+export function isBotMentioned(mentions: unknown, botOpenId: string | null): boolean {
+	const list = Array.isArray(mentions) ? mentions : [];
+	if (list.length === 0) return false;
+	if (!botOpenId) return true;
+	return list.some((m: any) => m?.id?.open_id === botOpenId);
+}
+
 export function startLark() {
 	if (!APP_ID || !APP_SECRET) {
 		log("未配置 LARK_APP_ID/SECRET，跳过 Lark 桥");
@@ -72,6 +83,16 @@ export function startLark() {
 	}
 	const client = new lark.Client({ appId: APP_ID, appSecret: APP_SECRET, domain: LARK_DOMAIN });
 	const wsClient = new lark.WSClient({ appId: APP_ID, appSecret: APP_SECRET, domain: LARK_DOMAIN, loggerLevel: lark.LoggerLevel.info });
+
+	// 拉取机器人自身 open_id（群聊 @ 判定用）；失败则退化为宽松判定
+	let botOpenId: string | null = null;
+	client
+		.request({ method: "GET", url: "/open-apis/bot/v3/info" })
+		.then((res: any) => {
+			botOpenId = res?.bot?.open_id ?? res?.data?.bot?.open_id ?? null;
+			log(botOpenId ? `机器人身份已确认: ${botOpenId}` : "未取到机器人 open_id（群聊@判定退化为宽松模式）");
+		})
+		.catch((e: unknown) => log(`bot info 拉取失败（群聊@判定退化为宽松模式）: ${e instanceof Error ? e.message : e}`));
 
 	async function reply(messageId: string, text: string) {
 		const larkMd = mdToLark(text);
@@ -127,8 +148,7 @@ export function startLark() {
 					return;
 				}
 				if (msg.chat_type === "group") {
-					const mentioned = (msg.mentions ?? []).some((m: any) => m.id?.open_id || m.key);
-					if (!mentioned) return; // 未 @机器人，忽略
+					if (!isBotMentioned(msg.mentions, botOpenId)) return; // 未 @本机器人，忽略
 					text = text.replace(/@_user_\d+/g, "").trim();
 					if (!text) return;
 				}
@@ -141,10 +161,14 @@ export function startLark() {
 					// 长操作先给提示（DECISIONS #17）
 					const extracting = /纪要|会议|周报|总结/.test(text);
 					if (extracting) await reply(msg.message_id, "收到，正在提取…");
+					let timer: NodeJS.Timeout | undefined;
 					try {
 						const answer = await Promise.race([
 							askAgent(s.agent, text),
-							new Promise<string>((_, rej) => setTimeout(() => rej(new Error("timeout")), TIMEOUT_MS)),
+							new Promise<string>((_, rej) => {
+								timer = setTimeout(() => rej(new Error("timeout")), TIMEOUT_MS);
+								timer.unref(); // 不阻止进程退出
+							}),
 						]);
 						await reply(msg.message_id, answer);
 					} catch (e) {
@@ -156,6 +180,8 @@ export function startLark() {
 							log(`agent 处理失败: ${m}`);
 							await reply(msg.message_id, "处理出错了，请稍后重试");
 						}
+					} finally {
+						clearTimeout(timer); // 成功路径同样清掉超时定时器（原先每条消息泄漏一个）
 					}
 				});
 			} catch (e) {

@@ -19,3 +19,6 @@ pi-main/
 # 临时
 *.corrupt-*
 ref/
+
+# 优化待办清单（内部文档，含敏感细节，不入库）
+docs/OPTIMIZATIONS.md

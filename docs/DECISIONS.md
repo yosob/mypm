@@ -145,3 +145,16 @@ RAG-MCP（按查询动态注入工具）适用于几十上百个工具的规模�
 - 卡片三段式：🔴逾期 / 🟠N天内重点 / ⚪窗口内普通；模板色 red/orange/blue
 - reminders 表重构（task_id,date 按天去重，替代旧 task_id,kind 一次性去重），
   旧表自动重建（去重态数据可弃）；同日多次 runCheck 只发一张卡
+
+## 决议 #38（2026-08-31）：全面审计 → 本轮只修缺陷批，其余立清单待议
+
+- 后端/前端/工程化三路审计，产出约 40 个发现（遗留优化点清单在本地维护，不入库）
+- 本轮修复 8 个真缺陷：cancel_timer 假取消（cron 调度不停）、会话压缩摘要链断裂
+  （第二次压缩覆盖第一次产出，长程记忆丢失）、deleteProject 跨项目 parent_id FK 崩溃、
+  提醒先标记后发送（通道失败当日丢提醒，改为发送成功才标记）、群聊 @ 判定过宽
+  （任何人被 @ 都触发，改为 bot open_id 精确比对）、优雅退出（SIGINT/SIGTERM + db.close，
+  消 Windows libuv 断言）、Lark 超时定时器泄漏、replace 替换序列注入
+- **Web 鉴权暂不做**（用户决策：家庭局域网信任模型）——做内网穿透前必须补 token 鉴权
+- 测试改进：runCheck 支持注入 notify（测试不再实发 Lark）；timers/session/db/mention
+  各补回归用例
+
