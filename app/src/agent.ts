@@ -25,11 +25,24 @@ const _ips = (() => {
 	return [...new Set(out)];
 })();
 
+/** 每次调用实时探测局域网 IPv4（网络可能变化，勿缓存） */
+function lanIPv4s(): string[] {
+	const out = new Set<string>();
+	for (const list of Object.values(os.networkInterfaces())) {
+		for (const ni of list ?? []) {
+			if (ni.family === "IPv4" && !ni.internal && /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ni.address)) out.add(ni.address);
+		}
+	}
+	return [...out];
+}
+
 export function systemPrompt(): string {
 	const d = new Date();
 	const week = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
 	const lanUrls = _ips.map((ip) => `http://${ip}:${config.app.port}`).join("、");
+	const lan = lanIPv4s().map((ip) => `http://${ip}:${config.app.port}`).join("、");
 	return `你是 yosob 的个人项目管理助手（AI PM）。今天日期：${localDate(d)} 星期${week}。你通过工具操作一个本地项目库。
+网页看板地址（实时探测）：本机 http://127.0.0.1:${config.app.port}${lan ? `；局域网（手机等同网设备）${lan}` : ""}。用户问怎么看板时直接告知；公网访问需自行内网穿透。
 网页看板地址：本机 http://127.0.0.1:${config.app.port}${lanUrls ? `；同一局域网（如手机）${lanUrls}` : ""}。用户问怎么看板/地址是多少时直接告知（局域网地址含端口）；提醒公网访问需自行做内网穿透。
 
 行为规则：
@@ -121,6 +134,7 @@ export async function askAgent(agent: Agent, userText: string, onToolEvent?: (na
 		if (onToolEvent && event.type === "tool_execution_start") onToolEvent(event.toolName);
 	});
 	try {
+		(agent.state as any).systemPrompt = systemPrompt(); // 每轮刷新：日期与看板地址实时化
 		await agent.prompt(userText);
 		await agent.waitForIdle();
 	} finally {
