@@ -22,6 +22,49 @@ function session(chatId: string) {
 	return s;
 }
 
+/**
+ * 标准 Markdown → 卡片 lark_md 的确定性转换（模型端零约束）。
+ * 规则表见 docs/DECISIONS.md #34；代码块内不转换。
+ */
+export function mdToLark(md: string): string {
+	const lines = md.split("\n");
+	let inCode = false;
+	const out = lines.map((line) => {
+		if (/^```/.test(line.trim())) {
+			inCode = !inCode;
+			return line; // 围栏保留（lark_md 7.6+ 支持）
+		}
+		if (inCode) return line;
+		// 11) 分割线
+		if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) return "—————————";
+		// 1/2) 标题
+		const h = line.match(/^(#{1,6})\s+(.*)$/);
+		if (h) return h[1].length <= 2 ? `**【${inline(h[2])}】**` : `**${inline(h[2])}**`;
+		// 8) 引用
+		const q = line.match(/^\s*>\s?(.*)$/);
+		if (q) return `▎${inline(q[1])}`;
+		// 12) 表格行
+		if (/^\s*\|.*\|\s*$/.test(line)) {
+			const cells = line.trim().replace(/^\||\|$/g, "").split("|").map((c) => inline(c.trim()));
+			if (cells.every((c) => /^:?-{2,}:?$/.test(c) || c === "")) return ""; // 分隔行丢弃
+			return cells.join(" ｜ ");
+		}
+		// 3) 无序列表（含嵌套缩进）
+		const ul = line.match(/^(\s*)[-*+]\s+(.*)$/);
+		if (ul) return `${ul[1]}• ${inline(ul[2])}`;
+		return inline(line);
+	});
+	return out.filter((l) => l !== "").join("\n");
+}
+/** 行内处理：图片降级链接、行内代码去壳 */
+function inline(t: string): string {
+	return t.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, "[图片：$1]($2)").replace(/`([^`]+)`/g, "$1");
+}
+
+function cardContent(larkMd: string) {
+	return JSON.stringify({ elements: [{ tag: "div", text: { tag: "lark_md", content: larkMd } }] });
+}
+
 export function startLark() {
 	if (!APP_ID || !APP_SECRET) {
 		log("未配置 LARK_APP_ID/SECRET，跳过 Lark 桥");
@@ -31,16 +74,33 @@ export function startLark() {
 	const wsClient = new lark.WSClient({ appId: APP_ID, appSecret: APP_SECRET, domain: LARK_DOMAIN, loggerLevel: lark.LoggerLevel.info });
 
 	async function reply(messageId: string, text: string) {
-		// 超长分段（卡片显示 3000 字截断，按 2000 分段）
-		const parts = text.match(/[\s\S]{1,2000}/g) ?? ["（空回复）"];
+		const larkMd = mdToLark(text);
+		// 超长按行边界分段（每卡 ~2000 字符）
+		const parts: string[] = [];
+		let cur = "";
+		for (const line of larkMd.split("\n")) {
+			if ((cur + line).length > 1900 && cur) {
+				parts.push(cur);
+				cur = line;
+			} else cur = cur ? cur + "\n" + line : line;
+		}
+		if (cur || !parts.length) parts.push(cur || "（空回复）");
 		for (const part of parts) {
 			try {
 				await client.im.message.reply({
 					path: { message_id: messageId },
-					data: { content: JSON.stringify({ text: part }), msg_type: "text" },
+					data: { content: cardContent(part), msg_type: "interactive" },
 				});
 			} catch (e) {
-				log(`Lark 回复失败: ${e instanceof Error ? e.message : e}`);
+				log(`卡片回复失败，降级 text: ${e instanceof Error ? e.message : e}`);
+				try {
+					await client.im.message.reply({
+						path: { message_id: messageId },
+						data: { content: JSON.stringify({ text: part }), msg_type: "text" },
+					});
+				} catch (e2) {
+					log(`Lark 回复失败(降级后): ${e2 instanceof Error ? e2.message : e2}`);
+				}
 			}
 		}
 	}
