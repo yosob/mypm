@@ -90,6 +90,8 @@ export function startWeb(port: number) {
 		if (b.due_date !== undefined) patch.due_date = b.due_date ? String(b.due_date) : null;
 		if (b.start_date !== undefined) patch.start_date = b.start_date ? String(b.start_date) : null;
 		if (b.priority !== undefined && ["P0", "P1", "P2", "P3"].includes(b.priority)) patch.priority = b.priority;
+		if (b.done !== undefined) patch.done = !!b.done; // 此前静默忽略 done/status，与 /toggle /status 端点不对齐
+		if (b.status !== undefined && ["todo", "doing", "done"].includes(b.status)) patch.status = b.status;
 		if (b.parent_id !== undefined) {
 			patch.parent_id = b.parent_id ? Number(b.parent_id) : null;
 			if (patch.parent_id) {

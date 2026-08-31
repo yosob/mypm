@@ -79,6 +79,13 @@
   .gantt_task_line.g-overdue { box-shadow:0 0 0 2px var(--danger) inset; }
   .gantt_task_line.g-soon { box-shadow:0 0 0 2px var(--warn) inset; }
   .gantt_task_line.g-ms { box-shadow:0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,.25); }
+  .gantt_task_line.g-done { opacity:.45; }
+  .gantt_task_line.g-done .gantt_task_content { text-decoration:line-through; }
+  /* 状态多选筛选按钮（亮=显示该状态，灭=隐藏） */
+  .stgrp { display:inline-flex; gap:4px; }
+  .stbtn { padding:6px 10px; border:1px solid #d0d4d8; border-radius:6px; background:#fff; font-size:13px; cursor:pointer; }
+  .stbtn.on { background:#eef3fb; border-color:var(--c1); color:var(--c1); }
+  .stbtn:not(.on) { background:#f3f4f6; color:#9aa4ad; text-decoration:line-through; }
   .today_marker { background:var(--danger); width:2px; opacity:.85; }
   .today_marker::before { content:"今天"; position:absolute; top:-18px; left:-12px; font-size:10px; color:var(--danger); }
   .gantt_tooltip { font-size:12px; }
@@ -161,10 +168,9 @@
 
 <div class="toolbar">
   <select id="proj-filter"></select>
-  <select id="status-filter">
-    <option value="all">全部状态</option><option value="todo">待办</option>
-    <option value="doing">进行中</option><option value="done">已完成</option>
-  </select>
+  <span id="status-filter" class="stgrp">
+    <button type="button" data-st="todo" class="stbtn on" title="点击亮/灭筛选待办">○ 待办</button><button type="button" data-st="doing" class="stbtn on" title="点击亮/灭筛选进行中">◐ 进行中</button><button type="button" data-st="done" class="stbtn on" title="点击亮/灭筛选已完成">✅ 已完成</button>
+  </span>
   <input class="searchbox" id="search" placeholder="搜索任务/项目…">
   <select id="sort">
     <option value="due-asc">截止日 ↑</option><option value="due-desc">截止日 ↓</option><option value="created-desc">创建日 ↓</option>
@@ -287,6 +293,7 @@
 
 <script>
 let DATA=null, curView="Week", curTab="overview", curTaskId=null, editing=false;
+const stOn={todo:true,doing:true,done:true}; // 状态多选筛选（亮=显示），按钮静态不被 load 重建，60s 刷新不重置
 const gantt = (typeof Gantt !== "undefined" && Gantt.getGanttInstance) ? Gantt.getGanttInstance() : null;
 const COLORS=["#4a6fa5","#7a9e7e","#b08552","#8a6f9e","#a05a7e","#5a8ea0"];
 const STATUS_TXT={todo:"待办",doing:"进行中",done:"已完成"};
@@ -313,7 +320,9 @@ async function load(){
   sel.innerHTML='<option value="all">全部项目</option>'+DATA.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
   if([...sel.options].some(o=>o.value===prevSel)) sel.value=prevSel;
   sel.onchange=()=>{render();showRes(sel.value);};
-  document.getElementById("status-filter").onchange=render;
+  document.getElementById("status-filter").querySelectorAll(".stbtn").forEach(b=>b.onclick=()=>{
+    b.classList.toggle("on");stOn[b.dataset.st]=b.classList.contains("on");render();
+  });
   document.getElementById("search").oninput=render;
   document.getElementById("sort").onchange=render;
   document.querySelectorAll(".viewbtn").forEach(b=>b.onclick=()=>{
@@ -354,11 +363,10 @@ function visibleProjects(){
   return v==="all"?DATA.projects:DATA.projects.filter(p=>p.id===+v);
 }
 function filteredTasks(projs){
-  const st=document.getElementById("status-filter").value;
   const q=document.getElementById("search").value.trim().toLowerCase();
   const sort=document.getElementById("sort").value;
   let ts=[];projs.forEach(p=>ts.push(...p.tasks));
-  if(st!=="all")ts=ts.filter(t=>statusOf(t)===st);
+  ts=ts.filter(t=>stOn[statusOf(t)]); // 状态多选：任一亮着的状态都显示
   if(q)ts=ts.filter(t=>t.title.toLowerCase().includes(q)||(t.project_name||"").toLowerCase().includes(q));
   ts.sort((a,b)=>{
     if(sort==="created-desc")return b.id-a.id;
@@ -414,11 +422,11 @@ function renderGantt(ts,projs){
   const g=gantt;
   const today=localDate(new Date());
   const data=[];
-  const visible=new Set(ts.filter(t=>!t.done).map(t=>String(t.id))); // 子任务的父若被筛掉/已完成则回挂项目行，防孤儿引用
+  const visible=new Set(ts.map(t=>String(t.id))); // 子任务的父若被筛掉则回挂项目行，防孤儿引用
   projs.forEach((p,pi)=>{
     data.push({id:`p${p.id}`,text:`📁 ${p.name}`,open:true,type:"project",
       progress:p.tasks.length?Math.round(p.tasks.filter(t=>t.done).length/p.tasks.length*100)/100:0,color_idx:pi%6});
-    ts.filter(t=>t.project_id===p.id&&!t.done).forEach(t=>{
+    ts.filter(t=>t.project_id===p.id).forEach(t=>{ // 已完成任务保留（半透明+划线），由状态筛选按钮控制显隐
       const di=dueInfo(t);
       const start=t.start_date||t.created_at;
       const due=t.due_date||addDays(start,7);
@@ -429,7 +437,7 @@ function renderGantt(ts,projs){
         duration:t.is_milestone?1:dur,
         type:t.is_milestone?"milestone":"task",
         parent:gparent,color_idx:pi%6,due_txt:(t.due_date||"").slice(5),start_txt:(t.is_milestone?(t.due_date||due):start).slice(5),
-        warn:di.overdue?"overdue":di.soon?"soon":null});
+        warn:di.overdue?"overdue":di.soon?"soon":null,done:t.done});
     });
   });
   const el=document.getElementById("gantt");
@@ -451,6 +459,7 @@ function renderGantt(ts,projs){
       if(task.warn==="overdue")cls.push("g-overdue");
       if(task.warn==="soon")cls.push("g-soon");
       if(task.type==="milestone")cls.push("g-ms");
+      if(task.done)cls.push("g-done");
       return cls.join(" ");
     };
     g.attachEvent("onTaskClick",(id)=>{
