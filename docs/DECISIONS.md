@@ -172,3 +172,21 @@ RAG-MCP（按查询动态注入工具）适用于几十上百个工具的规模�
 - 看板：新建/编辑弹窗父任务下拉（未完成且非子任务的同项目任务），列表 └ 缩进、
   看板 ↳ 前缀、甘特挂父任务行成树（父被筛除时回挂项目行防孤儿引用）
 
+## 决议 #40（2026-08-31）：工具面按方法论重构 15 → 10（每实体一条写路径）
+
+- **动因**：工具数超业界甜区（共识 5~10，MLflow"超 8 个是设计问题"），且存在重叠
+  （Anthropic《Writing effective tools for agents》：重叠工具会分散 agent 注意力）。
+  根因是"看板功能逐一映射补工具"而非按用户意图设计工作流
+- **合并四组**：get_project_detail 并入 list_projects（传 project=详情模式，response
+  详略思路）；apply+discard → resolve_updates(action)；timer 三件套 → timer(action=
+  set/list/cancel)；set_custom_field 并入 update_task（custom 参数，Record schema，
+  模糊匹配逻辑不变）
+- **否决"通用 update(entity, patch)"**（15→9 的激进方案）：task/project 的 status 等
+  字段撞名异义，schema 无法条件化表达，patch 松散化把参数错误从 schema 校验推迟到
+  运行时。业界佐证：Linear/Todoist MCP 均按实体拆 update_issue/update_task，通用
+  update_record 仅见于无固定 schema 的存储（Airtable）且被诟病"改一字段链 4-5 次调用"
+- **结果结构**：读 4（总览→粗筛→精查分层）写 6，每实体恰好一条写路径；e2e 验证
+  AI 在新工具面路由正确（propose→resolve(apply)→update_task(custom)→list_projects
+  (详情)→timer(set/cancel) 全 PASS）
+- prompt 规则 3/10 措辞同步；文档口径统一为 10（此前 11/14/15 三种漂移）
+
