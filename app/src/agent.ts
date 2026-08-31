@@ -4,7 +4,7 @@ import { localDate, log } from "./paths";
 import { config } from "./config";
 import { model, streamFn, summarizeHistory } from "./ai";
 import { pmTools } from "./tools";
-import { loadSession, saveSession, type SessionData } from "./db";
+import { loadSession, saveSession, getSetting, type SessionData } from "./db";
 
 process.env.TZ = "Asia/Shanghai";
 
@@ -36,6 +36,20 @@ function lanIPv4s(): string[] {
 	return [...out];
 }
 
+/** 上次每日提醒的运行结果（check.ts 写 settings kv；供 system prompt 注入，AI 据此如实回答"怎么没提醒我"） */
+function lastCheckLine(): string {
+	try {
+		const raw = getSetting("last_check");
+		if (!raw) return "（尚未运行过）";
+		const lc = JSON.parse(raw) as { at: string; ok: boolean; count?: number; reason?: string; note?: string };
+		return lc.ok
+			? `${lc.at} ✅ ${lc.count ? `发送成功（${lc.count} 条）` : lc.note ?? "无待发"}`
+			: `${lc.at} ❌ 发送失败（${lc.reason ?? "未知原因"}），下次检查自动重试`;
+	} catch {
+		return "（记录不可读）";
+	}
+}
+
 export function systemPrompt(): string {
 	const d = new Date();
 	const week = ["日", "一", "二", "三", "四", "五", "六"][d.getDay()];
@@ -44,6 +58,7 @@ export function systemPrompt(): string {
 	return `你是 yosob 的个人项目管理助手（AI PM）。今天日期：${localDate(d)} 星期${week}。你通过工具操作一个本地项目库。
 网页看板地址（实时探测）：本机 http://127.0.0.1:${config.app.port}${lan ? `；局域网（手机等同网设备）${lan}` : ""}。用户问怎么看板时直接告知；公网访问需自行内网穿透。
 网页看板地址：本机 http://127.0.0.1:${config.app.port}${lanUrls ? `；同一局域网（如手机）${lanUrls}` : ""}。用户问怎么看板/地址是多少时直接告知（局域网地址含端口）；提醒公网访问需自行做内网穿透。
+系统自动调度（内置，工具不可取消）：每日项目提醒 cron "${config.app.remindCron}"——每天把 ${config.app.remindDays} 天内到期任务（逾期与 ≤${config.app.remindHighlightDays} 天为重点档）自动推卡片，不经工具、无需设置。上次运行：${lastCheckLine()}。用户问"怎么没提醒我/没收到提醒"：如实说明该机制与上次结果（发送失败会自动重试，重启服务会立即补查一次）；不要回答"没有主动提醒功能"，也不要用 timer 为每日任务提醒另设闹钟。
 
 行为规则：
 1. 绝不编造数据。任何项目/任务信息必须来自工具返回结果。

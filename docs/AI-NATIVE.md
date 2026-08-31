@@ -134,7 +134,7 @@ export const listTasksTool: AgentTool = {
 | `update_task` | 写 | 任务全属性修改：改期/状态/完成/改名/优先级/父子关联（parent_task_id 置 0 解除，父完成级联子完成）/自定义字段（custom 参数，字段名模糊匹配） |
 | `update_project` ★ | 写 | 项目目标/状态(推进中·搁置·完成)/项目截止日 |
 | `add_resource` | 写 | 资料(群/链接/备注)，默认挂项目、可传 task_id 挂任务级 |
-| `timer` | 写 | 定时提醒三合一：action=set(一次性 run_at 或周期 cron)/list/cancel，到点机器人私聊卡片 |
+| `timer` | 写 | 定时提醒三合一：action=set(一次性 run_at 或周期 cron)/list/cancel，到点机器人私聊卡片；list 附系统内置每日提醒行（不可取消） |
 
 ★ = 看板功能上线后补齐的 AI 入口。设计原则：**每个实体恰好一条写路径**（任务=update_task、项目=update_project、拟更新=resolve_updates、定时器=timer），读取分层（总览→粗筛→精查），schema 全部保留类型约束（未采用通用 update(entity,patch) 模式，因 task/project 的 status 等字段撞名异义，松散 patch 违反"参数无歧义"原则）。
 
@@ -142,6 +142,11 @@ export const listTasksTool: AgentTool = {
 
 ```
 你是 yosob 的个人项目管理助手（AI PM）。今天日期：{动态注入} 星期X。你通过工具操作一个本地项目库。
+{看板地址：每轮实时探测注入}
+系统自动调度（内置，工具不可取消）：每日项目提醒 cron "{config.app.remindCron}"——每天把 N 天内到期任务
+（逾期与 ≤N 天为重点档）自动推卡片，不经工具、无需设置。上次运行：{遥测，check.ts 写 settings kv}。
+用户问"怎么没提醒我"：如实说明该机制与上次结果（发送失败会自动重试，重启服务立即补查）；
+不要回答"没有主动提醒功能"，也不要用 timer 为每日任务提醒另设闹钟。
 
 行为规则：
 1. 绝不编造数据。任何项目/任务信息必须来自工具返回结果。
@@ -205,6 +210,7 @@ export const listTasksTool: AgentTool = {
 | 任务级资料 | add_resource 可选 task_id + get_task 读取 | ✅ |
 | 自定义字段 | update_task 的 custom 参数写 + get_task 读（定义在看板⚙，AI 不擅自建） | ✅ |
 | 子任务（一层/同项目/级联完成） | create_task + update_task 的 parent_task_id 参数，prompt 规则 13 | ✅ |
+| 系统调度感知（DECISIONS #41） | prompt 每轮注入调度块+上次运行遥测（settings kv），timer list 附系统行 | ✅ |
 | 主动提醒 | cron 9:00 → 机器人私聊卡片（纯工作流，不经 agent） | ✅ |
 | 周报生成 / 图片纪要 / 偏好记忆 | 待做 | ⬜ |
 

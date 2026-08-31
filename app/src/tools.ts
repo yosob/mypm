@@ -4,6 +4,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import * as db from "./db";
 import { extractUpdates } from "./ai";
 import { scheduleCron, stopCron } from "./timers";
+import { config } from "./config";
 
 function ok(text: string) {
 	return { content: [{ type: "text" as const, text }], details: {} };
@@ -300,7 +301,7 @@ export const pmTools: AgentTool<any, any>[] = [
 		name: "timer",
 		label: "定时提醒",
 		description:
-			"管理定时提醒。action=set：设置提醒——一次性传 run_at（YYYY-MM-DD HH:mm，24小时制），周期传 cron（如每天9点='0 9 * * *'，每周一8点半='30 8 * * 1'，工作日='0 9 * * 1-5'），相对时间（明天下午3点）先换算成绝对时间；action=list：查询现有提醒；action=cancel：取消提醒。用户说'到点提醒我/定时提醒/每周X提醒我/我有哪些提醒/取消提醒'时调用。",
+			"管理定时提醒。action=set：设置提醒——一次性传 run_at（YYYY-MM-DD HH:mm，24小时制），周期传 cron（如每天9点='0 9 * * *'，每周一8点半='30 8 * * 1'，工作日='0 9 * * 1-5'），相对时间（明天下午3点）先换算成绝对时间；action=list：查询现有提醒（含系统内置的每日项目提醒，该条不可取消）；action=cancel：取消提醒。用户说'到点提醒我/定时提醒/每周X提醒我/我有哪些提醒/取消提醒'时调用。注意：每天的任务到期提醒是系统内置的，用户要「每天提醒我任务」时无需用本工具另设。",
 		parameters: Type.Object({
 			action: Type.String({ description: "set=设置 / list=查询 / cancel=取消" }),
 			title: Type.Optional(Type.String({ description: "[set] 提醒内容（会原样出现在提醒卡片标题）" })),
@@ -320,11 +321,11 @@ export const pmTools: AgentTool<any, any>[] = [
 			}
 			if (params.action === "list") {
 				const ts = db.listTimers();
-				if (!ts.length) return ok("（暂无定时提醒）");
 				const stTxt: Record<string, string> = { active: "生效中", fired: "已触发", cancelled: "已取消" };
-				return ok(
-					ts.map((t) => `[id=${t.id}]「${t.title}」｜ ${t.cron ? `周期 ${t.cron}` : t.run_at} ｜ ${stTxt[t.status] ?? t.status}`).join("\n"),
-				);
+				const lines = ts.map((t) => `[id=${t.id}]「${t.title}」｜ ${t.cron ? `周期 ${t.cron}` : t.run_at} ｜ ${stTxt[t.status] ?? t.status}`);
+				// 附系统内置调度（不在 timers 表、无数字 id，cancel 碰不到），保持与 prompt 口径一致
+				const sys = `[系统] 每日项目提醒 ｜ cron ${config.app.remindCron} ｜ ${config.app.remindDays} 天窗口（内置，不可取消）`;
+				return ok((lines.length ? lines.join("\n") : "（暂无自定义定时提醒）") + "\n" + sys);
 			}
 			if (params.action === "cancel") {
 				if (!db.cancelTimer(params.timer_id)) throw new Error(`定时器 ${params.timer_id} 不存在或已结束`);

@@ -5,6 +5,18 @@ import { backup } from "./db";
 import { notifyCard } from "./notify";
 import { log } from "./paths";
 
+/** 本地时间戳 YYYY-MM-DD HH:mm（记录提醒运行遥测用） */
+function localStamp(): string {
+	const d = new Date();
+	const p = (n: number) => String(n).padStart(2, "0");
+	return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** 记录本次检查结果（settings kv，供 system prompt 注入——AI 据此回答"怎么没提醒我"） */
+function recordCheck(rec: { ok: boolean; count?: number; reason?: string; note?: string }) {
+	db.setSetting("last_check", JSON.stringify({ at: localStamp(), ...rec }));
+}
+
 function taskLine(t: db.Task, today: string, strong: boolean): string {
 	const left = Math.round((Date.parse(t.due_date!) - Date.parse(today)) / 86400_000);
 	const when = left < 0 ? `**已逾期 ${-left} 天**` : left === 0 ? "**今天到期**" : `还剩 ${left} 天`;
@@ -45,15 +57,24 @@ export async function runCheck(opts: { withBackup?: boolean; notify?: typeof not
 		if (soon.length) parts.push(`**🟠 ${highlight} 天内到期（重点）**\n` + soon.join("\n"));
 		if (week.length) parts.push(`**⚪ ${window} 天内到期**\n` + week.join("\n"));
 		const template = overdue.length ? "red" : soon.length ? "orange" : "blue";
-		const sent = await notify(`📋 每日项目提醒（${today}）`, parts, template);
+		let sent = false;
+		try {
+			sent = await notify(`📋 每日项目提醒（${today}）`, parts, template);
+		} catch (e) {
+			log(`提醒发送异常: ${e instanceof Error ? e.message : e}`);
+			sent = false;
+		}
 		if (sent) {
 			for (const t of fresh) db.markRemindedToday(t.id, today);
 			log(`提醒已发送并标记：逾期${overdue.length} 重点${soon.length} 普通${week.length}`);
+			recordCheck({ ok: true, count: fresh.length });
 		} else {
 			log("提醒发送失败（所有通道不可用），本次不标记，下次检查自动重试");
+			recordCheck({ ok: false, reason: "通知通道全部失败" });
 		}
 	} else {
 		log("今日提醒卡片已发过或暂无窗口内任务");
+		recordCheck({ ok: true, count: 0, note: "已提醒过或无窗口内任务" });
 	}
 
 	if (opts.withBackup !== false) {
